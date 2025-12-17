@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("patient")
+  isActive  Boolean  @default(true)
+  phone     String?
+  address   String?
+  dateOfBirth DateTime?
+  gender    String?
+  profileImage String? @db.LongText
+  doctorProfile DoctorProfile?
+  appointmentsAsPatient Appointment[] @relation("patient")
+  appointmentsAsDoctor  Appointment[] @relation("doctor")
+  createdAt DateTime @default(now())
+}
+
+model Specialty {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  doctors DoctorProfile[]
+}
+
+model DoctorProfile {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  user         User     @relation(fields: [userId], references: [id])
+  specialtyId  Int
+  specialty    Specialty @relation(fields: [specialtyId], references: [id])
+  bio          String?
+  degree       String?
+  experience   String?
+  fees         Float?
+  address1     String?
+  address2     String?
+  profileImage String? @db.LongText
+}
+
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  patientId       Int
+  doctorId        Int
+  patient         User     @relation("patient", fields: [patientId], references: [id])
+  doctor          User     @relation("doctor", fields: [doctorId], references: [id])
+  appointmentDate DateTime @map("datetime")
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  medicalRecord   MedicalRecord?
+}
+
+model MedicalRecord {
+  id            Int      @id @default(autoincrement())
+  appointmentId Int      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  diagnosis     String
+  symptoms      String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  prescriptions Prescription[]
+}
+
+model Prescription {
+  id              Int      @id @default(autoincrement())
+  medicalRecordId Int
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  medication      String
+  dosage          String
+  duration        String
+  instructions    String?
+  createdAt       DateTime @default(now())
+}

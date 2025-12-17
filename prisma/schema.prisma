@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model appointment {
+  id                               Int            @id @default(autoincrement())
+  patientId                        Int
+  doctorId                         Int
+  datetime                         DateTime
+  status                           String         @default("pending")
+  createdAt                        DateTime       @default(now())
+  user_appointment_doctorIdTouser  user           @relation("appointment_doctorIdTouser", fields: [doctorId], references: [id], map: "Appointment_doctorId_fkey")
+  user_appointment_patientIdTouser user           @relation("appointment_patientIdTouser", fields: [patientId], references: [id], map: "Appointment_patientId_fkey")
+  medicalrecord                    medicalrecord?
+
+  @@index([doctorId], map: "Appointment_doctorId_fkey")
+  @@index([patientId], map: "Appointment_patientId_fkey")
+}
+
+model doctorprofile {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @unique(map: "DoctorProfile_userId_key")
+  specialtyId  Int
+  bio          String?
+  degree       String?
+  experience   String?
+  fees         Float?
+  address1     String?
+  address2     String?
+  profileImage String?   @db.LongText
+  specialty    specialty @relation(fields: [specialtyId], references: [id], map: "DoctorProfile_specialtyId_fkey")
+  user         user      @relation(fields: [userId], references: [id], map: "DoctorProfile_userId_fkey")
+
+  @@index([specialtyId], map: "DoctorProfile_specialtyId_fkey")
+}
+
+model medicalrecord {
+  id            Int            @id @default(autoincrement())
+  appointmentId Int            @unique(map: "MedicalRecord_appointmentId_key")
+  diagnosis     String
+  symptoms      String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  appointment   appointment    @relation(fields: [appointmentId], references: [id], map: "MedicalRecord_appointmentId_fkey")
+  prescription  prescription[]
+}
+
+model prescription {
+  id              Int           @id @default(autoincrement())
+  medicalRecordId Int
+  medication      String
+  dosage          String
+  duration        String
+  instructions    String?
+  createdAt       DateTime      @default(now())
+  medicalrecord   medicalrecord @relation(fields: [medicalRecordId], references: [id], map: "Prescription_medicalRecordId_fkey")
+
+  @@index([medicalRecordId], map: "Prescription_medicalRecordId_fkey")
+}
+
+model specialty {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique(map: "Specialty_name_key")
+  doctorprofile doctorprofile[]
+}
+
+model user {
+  id                                      Int            @id @default(autoincrement())
+  email                                   String         @unique(map: "User_email_key")
+  name                                    String?
+  password                                String
+  role                                    String         @default("patient")
+  isActive                                Boolean        @default(true)
+  phone                                   String?
+  address                                 String?
+  dateOfBirth                             DateTime?
+  gender                                  String?
+  profileImage                            String?        @db.LongText
+  createdAt                               DateTime       @default(now())
+  appointment_appointment_doctorIdTouser  appointment[]  @relation("appointment_doctorIdTouser")
+  appointment_appointment_patientIdTouser appointment[]  @relation("appointment_patientIdTouser")
+  doctorprofile                           doctorprofile?
+  sentMessages                            supportmessage[]      @relation("SentMessages")
+  receivedMessages                        supportmessage[]      @relation("ReceivedMessages")
+  chatsAsUser                             supportchat[]  @relation("UserChats")
+  chatsAsAdmin                            supportchat[]  @relation("AdminChats")
+}
+
+model supportchat {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  adminId         Int?
+  status          String    @default("open")
+  lastMessageAt   DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  user            user      @relation("UserChats", fields: [userId], references: [id])
+  admin           user?     @relation("AdminChats", fields: [adminId], references: [id])
+  messages        supportmessage[]
+
+  @@index([userId])
+  @@index([adminId])
+}
+
+model supportmessage {
+  id         Int          @id @default(autoincrement())
+  chatId     Int
+  senderId   Int
+  receiverId Int?
+  content    String       @db.Text
+  isRead     Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  chat       supportchat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender     user         @relation("SentMessages", fields: [senderId], references: [id])
+  receiver   user?        @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([receiverId])
+}
