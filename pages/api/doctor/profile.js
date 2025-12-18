@@ -18,9 +18,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
+      where: { id: decoded.userId },
       include: {
-        doctorProfile: {
+        doctorprofile: {
           include: {
             specialty: true
           }
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       email: user.email,
       name: user.name,
       role: user.role,
-      doctorProfile: user.doctorProfile
+      doctorProfile: user.doctorprofile
     })
   }
 
@@ -48,40 +48,40 @@ export default async function handler(req, res) {
       // Update user name if provided
       if (name) {
         await prisma.user.update({
-          where: { id: decoded.id },
+          where: { id: decoded.userId },
           data: { name }
         })
       }
 
       // Update doctor profile
       const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        include: { doctorProfile: true }
+        where: { id: decoded.userId },
+        include: { doctorprofile: true }
       })
 
-      if (!user.doctorProfile) {
+      if (!user.doctorprofile) {
         return res.status(400).json({ error: 'Doctor profile not found' })
       }
 
       const updateData = {}
       if (bio !== undefined) updateData.bio = bio
-      if (specialtyId) updateData.specialtyId = specialtyId
+      if (specialtyId) updateData.specialtyId = parseInt(specialtyId)
       if (degree !== undefined) updateData.degree = degree
       if (experience !== undefined) updateData.experience = experience
-      if (fees !== undefined) updateData.fees = fees
+      if (fees !== undefined) updateData.fees = parseFloat(fees)
       if (address1 !== undefined) updateData.address1 = address1
       if (address2 !== undefined) updateData.address2 = address2
       if (profileImage !== undefined) updateData.profileImage = profileImage
 
-      await prisma.doctorProfile.update({
-        where: { id: user.doctorProfile.id },
+      await prisma.doctorprofile.update({
+        where: { id: user.doctorprofile.id },
         data: updateData
       })
 
       return res.json({ success: true })
     } catch (err) {
-      console.error(err)
-      return res.status(500).json({ error: 'Failed to update profile' })
+      console.error('Update profile error:', err)
+      return res.status(500).json({ error: 'Failed to update profile', details: err.message })
     }
   }
 

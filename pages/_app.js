@@ -1,6 +1,11 @@
 import '../styles.css'
 import { useEffect, useState } from 'react'
-import ChatWidget from '../components/ChatWidget'
+import dynamic from 'next/dynamic'
+
+// Disable SSR for ChatWidget because it uses socket.io-client
+const ChatWidget = dynamic(() => import('../components/ChatWidget'), {
+  ssr: false
+})
 
 export default function MyApp({ Component, pageProps }) {
   const [user, setUser] = useState(null)

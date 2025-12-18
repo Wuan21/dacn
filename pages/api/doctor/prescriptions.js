@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       const record = await prisma.medicalRecord.findFirst({
         where: {
           id: medicalRecordId,
-          appointment: { doctorId: decoded.id }
+          appointment: { doctorId: decoded.userId }
         }
       })
 
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
         where: {
           id: prescriptionId,
           medicalRecord: {
-            appointment: { doctorId: decoded.id }
+            appointment: { doctorId: decoded.userId }
           }
         }
       })
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
         where: {
           id: prescriptionId,
           medicalRecord: {
-            appointment: { doctorId: decoded.id }
+            appointment: { doctorId: decoded.userId }
           }
         }
       })

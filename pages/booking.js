@@ -97,23 +97,23 @@ export default function Booking({ doctor }) {
 
       if (res.ok) {
         setSuccess(true)
-        showPopupMessage('✅ Thành công!', 'Đặt lịch khám thành công. Đang chuyển đến trang lịch hẹn...', 'success')
+        showPopupMessage('Thành công!', 'Đặt lịch khám thành công. Đang chuyển đến trang lịch hẹn...', 'success')
         setTimeout(() => {
           router.push('/patient/appointments')
         }, 2000)
       } else {
         if (res.status === 401) {
-          showPopupMessage('🔒 Chưa đăng nhập', 'Vui lòng đăng nhập để đặt lịch', 'error')
+          showPopupMessage('Chưa đăng nhập', 'Vui lòng đăng nhập để đặt lịch', 'error')
           setTimeout(() => router.push('/login'), 2000)
         } else if (res.status === 409) {
-          showPopupMessage('⚠️ Khung giờ đã được đặt', data.error || 'Khung giờ này đã có người đặt. Vui lòng chọn giờ khác.', 'error')
+          showPopupMessage('Khung giờ đã được đặt', data.error || 'Khung giờ này đã có người đặt. Vui lòng chọn giờ khác.', 'error')
           fetchBookedSlots() // Refresh booked slots
         } else {
-          showPopupMessage('❌ Lỗi', data.error || 'Đặt lịch thất bại. Vui lòng thử lại.', 'error')
+          showPopupMessage('Lỗi', data.error || 'Đặt lịch thất bại. Vui lòng thử lại.', 'error')
         }
       }
     } catch (err) {
-      showPopupMessage('❌ Lỗi', 'Có lỗi xảy ra. Vui lòng thử lại.', 'error')
+      showPopupMessage('Lỗi', 'Có lỗi xảy ra. Vui lòng thử lại.', 'error')
     } finally {
       setLoading(false)
     }

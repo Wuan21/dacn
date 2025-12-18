@@ -18,19 +18,39 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const appointments = await prisma.appointment.findMany({
-      where: { doctorId: decoded.id },
+      where: { doctorId: decoded.userId },
       include: {
-        patient: { select: { id: true, name: true, email: true } },
-        medicalRecord: {
+        user_appointment_patientIdTouser: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true,
+            phone: true,
+            address: true,
+            dateOfBirth: true,
+            gender: true
+          } 
+        },
+        medicalrecord: {
           include: {
-            prescriptions: true
+            prescription: true
           }
         }
       },
       orderBy: { datetime: 'desc' }
     })
 
-    return res.json(appointments)
+    // Format response
+    const formatted = appointments.map(apt => ({
+      id: apt.id,
+      datetime: apt.datetime,
+      status: apt.status,
+      createdAt: apt.createdAt,
+      patient: apt.user_appointment_patientIdTouser,
+      medicalRecord: apt.medicalrecord
+    }))
+
+    return res.json(formatted)
   }
 
   res.status(405).end()

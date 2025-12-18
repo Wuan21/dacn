@@ -25,10 +25,10 @@ export default async function handler(req, res) {
     } else if (patientId) {
       where.appointment = {
         patientId: parseInt(patientId),
-        doctorId: decoded.id
+        doctorId: decoded.userId
       }
     } else {
-      where.appointment = { doctorId: decoded.id }
+      where.appointment = { doctorId: decoded.userId }
     }
 
     const records = await prisma.medicalRecord.findMany({
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       const appointment = await prisma.appointment.findFirst({
         where: {
           id: appointmentId,
-          doctorId: decoded.id
+          doctorId: decoded.userId
         }
       })
 
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
       const record = await prisma.medicalRecord.findFirst({
         where: {
           id: recordId,
-          appointment: { doctorId: decoded.id }
+          appointment: { doctorId: decoded.userId }
         }
       })
 

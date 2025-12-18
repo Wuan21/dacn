@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const appointments = await prisma.appointment.findMany({
-      where: { doctorId: decoded.id },
+    where: { doctorId: decoded.userId },
       include: {
         medicalRecord: true
       }

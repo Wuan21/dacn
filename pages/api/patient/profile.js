@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
+        where: { id: decoded.userId },
         select: {
           id: true,
           email: true,
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       }
 
       const updatedUser = await prisma.user.update({
-        where: { id: decoded.id },
+        where: { id: decoded.userId },
         data: {
           name,
           phone: phone || null,
