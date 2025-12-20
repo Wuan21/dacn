@@ -117,9 +117,10 @@ export default function DoctorPatients(){
         <div className="nav-content">
           <Link href="/" className="nav-logo">🏥 YourMedicare</Link>
           <div className="nav-links">
-            <Link href="/doctor">Dashboard</Link>
+            <Link href="/doctor">Home</Link>
             <Link href="/doctor/appointments">Lịch hẹn</Link>
-            <Link href="/doctor/patients">Bệnh nhân</Link>
+            <Link href="/doctor/work-schedule">Lịch làm việc</Link>
+            <Link href="/doctor/patients">Lịch sử khám bệnh</Link>
             <Link href="/doctor/profile">Hồ sơ</Link>
             <div style={{ 
               display: 'flex', 

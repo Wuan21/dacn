@@ -17,10 +17,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    // Find doctor profile first
+    const doctorProfile = await prisma.doctorprofile.findUnique({
+      where: { userId: decoded.userId }
+    })
+
+    if (!doctorProfile) {
+      return res.status(404).json({ error: 'Doctor profile not found' })
+    }
+
     const appointments = await prisma.appointment.findMany({
-      where: { doctorId: decoded.userId },
+      where: { doctorProfileId: doctorProfile.id },
       include: {
-        user_appointment_patientIdTouser: { 
+        patient: { 
           select: { 
             id: true, 
             name: true, 
@@ -37,16 +46,16 @@ export default async function handler(req, res) {
           }
         }
       },
-      orderBy: { datetime: 'desc' }
+      orderBy: { appointmentTime: 'desc' }
     })
 
     // Format response
     const formatted = appointments.map(apt => ({
       id: apt.id,
-      datetime: apt.datetime,
+      datetime: apt.appointmentTime,
       status: apt.status,
       createdAt: apt.createdAt,
-      patient: apt.user_appointment_patientIdTouser,
+      patient: apt.patient,
       medicalRecord: apt.medicalrecord
     }))
 

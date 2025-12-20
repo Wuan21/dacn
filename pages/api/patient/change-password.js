@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-
-const prisma = new PrismaClient()
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+const prisma = require('../../../lib/prisma')
+const { getTokenFromReq, verifyToken, hashPassword, comparePassword } = require('../../../lib/auth')
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,12 +8,12 @@ export default async function handler(req, res) {
 
   try {
     // Verify token
-    const token = req.cookies.token
+    const token = getTokenFromReq(req)
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = verifyToken(token)
     
     // Verify role
     if (decoded.role !== 'patient') {
@@ -44,13 +40,13 @@ export default async function handler(req, res) {
     }
 
     // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password)
+    const isValidPassword = await comparePassword(currentPassword, user.password)
     if (!isValidPassword) {
       return res.status(400).json({ error: 'Current password is incorrect' })
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    const hashedPassword = await hashPassword(newPassword)
 
     // Update password
     await prisma.user.update({

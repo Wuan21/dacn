@@ -1,23 +1,16 @@
-import { PrismaClient } from '@prisma/client'
-import jwt from 'jsonwebtoken'
-
-const prisma = new PrismaClient()
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+const prisma = require('../../../lib/prisma')
+const { getTokenFromReq, verifyToken } = require('../../../lib/auth')
 
 export default async function handler(req, res) {
   try {
     // Verify token from cookie or Authorization header
-    let token = req.cookies.token
-    
-    if (!token && req.headers.authorization) {
-      token = req.headers.authorization.split(' ')[1]
-    }
+    const token = getTokenFromReq(req)
     
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = verifyToken(token)
     
     // Verify role
     if (decoded.role !== 'patient') {

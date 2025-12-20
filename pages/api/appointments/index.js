@@ -10,41 +10,45 @@ export default async function handler(req, res){
   if (req.method === 'GET'){
     try {
       // If patient: show my appointments
-      // If doctor: show appointments for me (or filter by doctorId query)
-      const { doctorId } = req.query
+      // If doctor: show appointments for me
       let where = {}
-      if (decoded.role === 'patient') where.patientId = decoded.userId
-      else if (decoded.role === 'doctor') where.doctorId = doctorId ? parseInt(doctorId) : decoded.userId
+      
+      if (decoded.role === 'patient') {
+        where.patientId = decoded.userId
+      } else if (decoded.role === 'doctor') {
+        // Find doctor profile
+        const doctorProfile = await prisma.doctorprofile.findUnique({
+          where: { userId: decoded.userId }
+        })
+        if (doctorProfile) {
+          where.doctorProfileId = doctorProfile.id
+        }
+      }
 
       const appts = await prisma.appointment.findMany({
         where,
         include: { 
-          user_appointment_patientIdTouser: { select: { id: true, name: true, email: true } },
-          user_appointment_doctorIdTouser: { 
-            select: { 
-              id: true, 
-              name: true,
-              doctorprofile: {
-                select: {
-                  specialty: { select: { name: true } }
-                }
-              }
+          patient: { select: { id: true, name: true, email: true } },
+          doctorProfile: { 
+            include: {
+              user: { select: { id: true, name: true } },
+              specialty: { select: { name: true } }
             }
           }
         },
-        orderBy: { datetime: 'desc' }
+        orderBy: { appointmentTime: 'desc' }
       })
       
       const result = appts.map(a => ({
         id: a.id,
-        appointmentDate: a.datetime,
+        appointmentDate: a.appointmentTime,
         status: a.status,
-        patient: a.user_appointment_patientIdTouser,
-        patientName: a.user_appointment_patientIdTouser.name,
-        patientEmail: a.user_appointment_patientIdTouser.email,
-        doctor: a.user_appointment_doctorIdTouser,
-        doctorName: a.user_appointment_doctorIdTouser.name,
-        specialty: a.user_appointment_doctorIdTouser.doctorprofile?.specialty?.name
+        patient: a.patient,
+        patientName: a.patient.name,
+        patientEmail: a.patient.email,
+        doctor: a.doctorProfile?.user,
+        doctorName: a.doctorProfile?.user?.name,
+        specialty: a.doctorProfile?.specialty?.name
       }))
       
       return res.json(result)
@@ -59,7 +63,7 @@ export default async function handler(req, res){
       // Create appointment (patient books doctor)
       const { doctorId, datetime } = req.body
       
-      console.log('Creating appointment:', { doctorId, datetime, userId: decoded.id, role: decoded.role })
+      console.log('Creating appointment:', { doctorId, datetime, userId: decoded.userId, role: decoded.role })
       
       if (!doctorId || !datetime) {
         return res.status(400).json({ error: 'Thiếu thông tin' })
@@ -83,20 +87,21 @@ export default async function handler(req, res){
         return res.status(400).json({ error: 'Thời gian không hợp lệ' })
       }
       
-      // Kiểm tra bác sĩ có tồn tại
-      const doctor = await prisma.user.findUnique({ 
-        where: { id: parseInt(doctorId) }
+      // Find doctor profile by user id
+      const doctorProfile = await prisma.doctorprofile.findFirst({
+        where: { userId: parseInt(doctorId) },
+        include: { user: true }
       })
       
-      if (!doctor || doctor.role !== 'doctor') {
+      if (!doctorProfile) {
         return res.status(404).json({ error: 'Bác sĩ không tồn tại' })
       }
       
       // Kiểm tra trùng lịch cho bác sĩ (cùng thời gian)
       const existingAppt = await prisma.appointment.findFirst({
         where: {
-          doctorId: parseInt(doctorId),
-          datetime: appointmentDate,
+          doctorProfileId: doctorProfile.id,
+          appointmentTime: appointmentDate,
           status: { not: 'cancelled' }
         }
       })
@@ -109,8 +114,8 @@ export default async function handler(req, res){
       const patientExisting = await prisma.appointment.findFirst({
         where: {
           patientId: decoded.userId,
-          doctorId: parseInt(doctorId),
-          datetime: appointmentDate,
+          doctorProfileId: doctorProfile.id,
+          appointmentTime: appointmentDate,
           status: { not: 'cancelled' }
         }
       })
@@ -120,30 +125,18 @@ export default async function handler(req, res){
       }
       
       // Tạo lịch hẹn
-      console.log('Creating appointment with data:', {
-        patientId: decoded.userId,
-        doctorId: parseInt(doctorId),
-        datetime: appointmentDate,
-        status: 'pending'
-      })
-      
       const appt = await prisma.appointment.create({
         data: {
           patientId: decoded.userId,
-          doctorId: parseInt(doctorId),
-          datetime: appointmentDate,
+          doctorProfileId: doctorProfile.id,
+          appointmentTime: appointmentDate,
           status: 'pending'
         },
         include: {
-          user_appointment_doctorIdTouser: {
-            select: {
-              id: true,
-              name: true,
-              doctorprofile: {
-                select: {
-                  specialty: { select: { name: true } }
-                }
-              }
+          doctorProfile: {
+            include: {
+              user: { select: { id: true, name: true } },
+              specialty: { select: { name: true } }
             }
           }
         }

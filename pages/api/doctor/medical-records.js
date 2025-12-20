@@ -19,19 +19,28 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { patientId, appointmentId } = req.query
 
+    // Find doctor profile first
+    const doctorProfile = await prisma.doctorprofile.findUnique({
+      where: { userId: decoded.userId }
+    })
+
+    if (!doctorProfile) {
+      return res.status(404).json({ error: 'Doctor profile not found' })
+    }
+
     let where = {}
     if (appointmentId) {
       where.appointmentId = parseInt(appointmentId)
     } else if (patientId) {
       where.appointment = {
         patientId: parseInt(patientId),
-        doctorId: decoded.userId
+        doctorProfileId: doctorProfile.id
       }
     } else {
-      where.appointment = { doctorId: decoded.userId }
+      where.appointment = { doctorProfileId: doctorProfile.id }
     }
 
-    const records = await prisma.medicalRecord.findMany({
+    const records = await prisma.medicalrecord.findMany({
       where,
       include: {
         appointment: {
@@ -39,7 +48,7 @@ export default async function handler(req, res) {
             patient: { select: { id: true, name: true, email: true } }
           }
         },
-        prescriptions: true
+        prescription: true
       },
       orderBy: { createdAt: 'desc' }
     })
@@ -55,11 +64,20 @@ export default async function handler(req, res) {
     }
 
     try {
+      // Find doctor profile
+      const doctorProfile = await prisma.doctorprofile.findUnique({
+        where: { userId: decoded.userId }
+      })
+
+      if (!doctorProfile) {
+        return res.status(404).json({ error: 'Doctor profile not found' })
+      }
+
       // Verify appointment belongs to this doctor
       const appointment = await prisma.appointment.findFirst({
         where: {
           id: appointmentId,
-          doctorId: decoded.userId
+          doctorProfileId: doctorProfile.id
         }
       })
 
@@ -68,7 +86,7 @@ export default async function handler(req, res) {
       }
 
       // Check if medical record already exists
-      const existing = await prisma.medicalRecord.findUnique({
+      const existing = await prisma.medicalrecord.findUnique({
         where: { appointmentId }
       })
 
@@ -77,23 +95,23 @@ export default async function handler(req, res) {
       }
 
       // Create medical record with prescriptions
-      const record = await prisma.medicalRecord.create({
+      const record = await prisma.medicalrecord.create({
         data: {
           appointmentId,
           diagnosis,
           symptoms: symptoms || null,
           notes: notes || null,
-          prescriptions: prescriptions && prescriptions.length > 0 ? {
+          prescription: prescriptions && prescriptions.length > 0 ? {
             create: prescriptions.map(p => ({
               medication: p.medication,
-              dosage: p.dosage,
-              duration: p.duration,
+              dosage: p.dosage || '',
+              duration: p.duration || '',
               instructions: p.instructions || null
             }))
           } : undefined
         },
         include: {
-          prescriptions: true,
+          prescription: true,
           appointment: {
             include: {
               patient: { select: { id: true, name: true, email: true } }
@@ -123,11 +141,20 @@ export default async function handler(req, res) {
     }
 
     try {
+      // Find doctor profile
+      const doctorProfile = await prisma.doctorprofile.findUnique({
+        where: { userId: decoded.userId }
+      })
+
+      if (!doctorProfile) {
+        return res.status(404).json({ error: 'Doctor profile not found' })
+      }
+
       // Verify record belongs to this doctor's appointment
-      const record = await prisma.medicalRecord.findFirst({
+      const record = await prisma.medicalrecord.findFirst({
         where: {
           id: recordId,
-          appointment: { doctorId: decoded.userId }
+          appointment: { doctorProfileId: doctorProfile.id }
         }
       })
 
@@ -140,11 +167,11 @@ export default async function handler(req, res) {
       if (symptoms !== undefined) updateData.symptoms = symptoms
       if (notes !== undefined) updateData.notes = notes
 
-      const updated = await prisma.medicalRecord.update({
+      const updated = await prisma.medicalrecord.update({
         where: { id: recordId },
         data: updateData,
         include: {
-          prescriptions: true,
+          prescription: true,
           appointment: {
             include: {
               patient: { select: { id: true, name: true, email: true } }

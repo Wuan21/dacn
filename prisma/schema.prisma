@@ -8,117 +8,142 @@ datasource db {
 }
 
 model appointment {
-  id                               Int            @id @default(autoincrement())
-  patientId                        Int
-  doctorId                         Int
-  datetime                         DateTime
-  status                           String         @default("pending")
-  createdAt                        DateTime       @default(now())
-  user_appointment_doctorIdTouser  user           @relation("appointment_doctorIdTouser", fields: [doctorId], references: [id], map: "Appointment_doctorId_fkey")
-  user_appointment_patientIdTouser user           @relation("appointment_patientIdTouser", fields: [patientId], references: [id], map: "Appointment_patientId_fkey")
-  medicalrecord                    medicalrecord?
+  id              Int                  @id @default(autoincrement())
+  patientId       Int
+  doctorProfileId Int
+  appointmentTime DateTime
+  status          appointments_status? @default(pending)
+  createdAt       DateTime?            @default(now())
+  patient         user                 @relation(fields: [patientId], references: [id], onDelete: Cascade, map: "appointments_ibfk_1")
+  doctorProfile   doctorprofile        @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade, map: "appointments_ibfk_2")
+  medicalrecord   medicalrecord?
 
-  @@index([doctorId], map: "Appointment_doctorId_fkey")
-  @@index([patientId], map: "Appointment_patientId_fkey")
+  @@index([doctorProfileId], map: "doctorProfileId")
+  @@index([patientId], map: "patientId")
+  @@map("appointments")
 }
 
 model doctorprofile {
-  id           Int       @id @default(autoincrement())
-  userId       Int       @unique(map: "DoctorProfile_userId_key")
-  specialtyId  Int
-  bio          String?
-  degree       String?
-  experience   String?
-  fees         Float?
-  address1     String?
-  address2     String?
-  profileImage String?   @db.LongText
-  specialty    specialty @relation(fields: [specialtyId], references: [id], map: "DoctorProfile_specialtyId_fkey")
-  user         user      @relation(fields: [userId], references: [id], map: "DoctorProfile_userId_fkey")
+  id              Int               @id @default(autoincrement())
+  userId          Int               @unique(map: "userId")
+  specialtyId     Int
+  bio             String?           @db.Text
+  degree          String?
+  experience      String?
+  fees            Decimal?          @db.Decimal(10, 2)
+  address1        String?
+  address2        String?
+  profileImage    String?           @db.LongText
+  appointments    appointment[]
+  doctorschedules doctorschedule[]
+  user            user              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "DoctorProfile_userId_fkey")
+  specialty       specialty         @relation(fields: [specialtyId], references: [id], map: "DoctorProfile_specialtyId_fkey")
 
-  @@index([specialtyId], map: "DoctorProfile_specialtyId_fkey")
+  @@index([specialtyId], map: "specialtyId")
+  @@map("doctor_profiles")
 }
 
 model medicalrecord {
   id            Int            @id @default(autoincrement())
-  appointmentId Int            @unique(map: "MedicalRecord_appointmentId_key")
-  diagnosis     String
-  symptoms      String?
-  notes         String?
-  createdAt     DateTime       @default(now())
-  appointment   appointment    @relation(fields: [appointmentId], references: [id], map: "MedicalRecord_appointmentId_fkey")
+  appointmentId Int            @unique(map: "appointmentId")
+  diagnosis     String         @db.Text
+  symptoms      String?        @db.Text
+  notes         String?        @db.Text
+  createdAt     DateTime?      @default(now())
+  appointment   appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade, map: "MedicalRecord_appointmentId_fkey")
   prescription  prescription[]
+
+  @@map("medical_records")
 }
 
 model prescription {
   id              Int           @id @default(autoincrement())
   medicalRecordId Int
   medication      String
-  dosage          String
-  duration        String
-  instructions    String?
-  createdAt       DateTime      @default(now())
-  medicalrecord   medicalrecord @relation(fields: [medicalRecordId], references: [id], map: "Prescription_medicalRecordId_fkey")
+  dosage          String?
+  duration        String?
+  instructions    String?       @db.Text
+  createdAt       DateTime?     @default(now())
+  medicalrecord   medicalrecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade, map: "Prescription_medicalRecordId_fkey")
 
-  @@index([medicalRecordId], map: "Prescription_medicalRecordId_fkey")
+  @@index([medicalRecordId], map: "medicalRecordId")
+  @@map("prescriptions")
 }
 
 model specialty {
   id            Int             @id @default(autoincrement())
-  name          String          @unique(map: "Specialty_name_key")
+  name          String          @unique(map: "name")
   doctorprofile doctorprofile[]
+
+  @@map("specialties")
+}
+
+model doctorschedule {
+  id              Int           @id @default(autoincrement())
+  doctorProfileId Int
+  dayOfWeek       Int           // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  shift           String        // 'morning', 'afternoon', 'evening'
+  startTime       String        // '08:00'
+  endTime         String        // '12:00'
+  isAvailable     Boolean       @default(true)
+  weekStartDate   DateTime?     // Ngày bắt đầu tuần (để quản lý theo tuần cụ thể)
+  createdAt       DateTime?     @default(now())
+  updatedAt       DateTime?     @updatedAt
+  doctorProfile   doctorprofile @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorProfileId, dayOfWeek, shift, weekStartDate])
+  @@index([doctorProfileId], map: "doctorschedule_doctorProfileId")
+  @@map("doctor_schedules")
+}
+
+model service {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?   @db.Text
+  price       Decimal   @db.Decimal(10, 2)
+  duration    Int
+  category    String?
+  icon        String?   @db.VarChar(50)
+  isActive    Boolean?  @default(true)
+  createdAt   DateTime? @default(now())
+
+  @@map("services")
 }
 
 model user {
-  id                                      Int            @id @default(autoincrement())
-  email                                   String         @unique(map: "User_email_key")
-  name                                    String?
-  password                                String
-  role                                    String         @default("patient")
-  isActive                                Boolean        @default(true)
-  phone                                   String?
-  address                                 String?
-  dateOfBirth                             DateTime?
-  gender                                  String?
-  profileImage                            String?        @db.LongText
-  createdAt                               DateTime       @default(now())
-  appointment_appointment_doctorIdTouser  appointment[]  @relation("appointment_doctorIdTouser")
-  appointment_appointment_patientIdTouser appointment[]  @relation("appointment_patientIdTouser")
-  doctorprofile                           doctorprofile?
-  sentMessages                            supportmessage[]      @relation("SentMessages")
-  receivedMessages                        supportmessage[]      @relation("ReceivedMessages")
-  chatsAsUser                             supportchat[]  @relation("UserChats")
-  chatsAsAdmin                            supportchat[]  @relation("AdminChats")
+  id            Int            @id @default(autoincrement())
+  email         String         @unique(map: "email")
+  name          String?
+  password      String
+  role          users_role     @default(patient)
+  isActive      Boolean?       @default(true)
+  phone         String?
+  address       String?
+  dateOfBirth   DateTime?
+  gender        users_gender?
+  profileImage  String?        @db.LongText
+  createdAt     DateTime?      @default(now())
+  appointments  appointment[]
+  doctorprofile doctorprofile?
+
+  @@map("users")
 }
 
-model supportchat {
-  id              Int       @id @default(autoincrement())
-  userId          Int
-  adminId         Int?
-  status          String    @default("open")
-  lastMessageAt   DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  user            user      @relation("UserChats", fields: [userId], references: [id])
-  admin           user?     @relation("AdminChats", fields: [adminId], references: [id])
-  messages        supportmessage[]
-
-  @@index([userId])
-  @@index([adminId])
+enum appointments_status {
+  pending
+  confirmed
+  completed
+  cancelled
 }
 
-model supportmessage {
-  id         Int          @id @default(autoincrement())
-  chatId     Int
-  senderId   Int
-  receiverId Int?
-  content    String       @db.Text
-  isRead     Boolean      @default(false)
-  createdAt  DateTime     @default(now())
-  chat       supportchat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender     user         @relation("SentMessages", fields: [senderId], references: [id])
-  receiver   user?        @relation("ReceivedMessages", fields: [receiverId], references: [id])
+enum users_role {
+  admin
+  doctor
+  patient
+}
 
-  @@index([chatId])
-  @@index([senderId])
-  @@index([receiverId])
+enum users_gender {
+  male
+  female
+  other
 }

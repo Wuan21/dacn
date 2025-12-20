@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
     // If doctor, create doctor profile
     if (role === 'doctor') {
-      await prisma.doctorProfile.create({
+      await prisma.doctorprofile.create({
         data: {
           userId: user.id,
           specialtyId: parseInt(specialtyId),

@@ -32,17 +32,11 @@ export default async function handler(req, res) {
       include: {
         appointment: {
           include: {
-            user_appointment_doctorIdTouser: { 
-              select: { 
-                id: true, 
-                name: true, 
-                email: true,
-                doctorprofile: {
-                  select: {
-                    specialty: { select: { name: true } }
-                  }
-                }
-              } 
+            doctorProfile: { 
+              include: {
+                user: { select: { id: true, name: true, email: true } },
+                specialty: { select: { name: true } }
+              }
             }
           }
         },

@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       }
 
       // Check if doctor profile already exists
-      const existingProfile = await prisma.doctorProfile.findUnique({
+      const existingProfile = await prisma.doctorprofile.findUnique({
         where: { userId }
       })
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Specialty not found' })
       }
 
-      const profile = await prisma.doctorProfile.create({
+      const profile = await prisma.doctorprofile.create({
         data: {
           userId,
           specialtyId,
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       if (bio !== undefined) updateData.bio = bio
       if (yearsOfExperience !== undefined) updateData.yearsOfExperience = yearsOfExperience
 
-      const profile = await prisma.doctorProfile.update({
+      const profile = await prisma.doctorprofile.update({
         where: { id: doctorProfileId },
         data: updateData,
         include: {
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
         })
       }
 
-      await prisma.doctorProfile.delete({
+      await prisma.doctorprofile.delete({
         where: { id: doctorProfileId }
       })
 
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
   // Get all doctor profiles
   if (req.method === 'GET') {
     try {
-      const doctors = await prisma.doctorProfile.findMany({
+      const doctors = await prisma.doctorprofile.findMany({
         include: {
           user: {
             select: { id: true, name: true, email: true }

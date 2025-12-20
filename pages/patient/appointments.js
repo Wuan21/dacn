@@ -9,6 +9,9 @@ export default function MyAppointments(){
   const [loading, setLoading] = useState(true)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [appointmentToCancel, setAppointmentToCancel] = useState(null)
   const router = useRouter()
 
   useEffect(()=>{
@@ -44,17 +47,29 @@ export default function MyAppointments(){
     }
   }
 
-  async function handleCancel(id) {
-    if (!confirm('Bạn có chắc muốn hủy lịch hẹn này?')) return
+  function handleCancel(id) {
+    setAppointmentToCancel(id)
+    setCancelReason('')
+    setShowCancelModal(true)
+  }
+
+  async function confirmCancel() {
+    if (!cancelReason.trim()) {
+      alert('Vui lòng nhập lý do hủy lịch hẹn')
+      return
+    }
     
     try {
-      const res = await fetch(`/api/appointments/${id}`, {
+      const res = await fetch(`/api/appointments/${appointmentToCancel}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json'
         },
-        credentials: 'include', // Ensure cookies are sent
-        body: JSON.stringify({ status: 'cancelled' })
+        credentials: 'include',
+        body: JSON.stringify({ 
+          status: 'cancelled',
+          cancellationReason: cancelReason.trim()
+        })
       })
       
       const data = await res.json()
@@ -63,6 +78,9 @@ export default function MyAppointments(){
         alert('Đã hủy lịch hẹn thành công!')
         loadAppointments()
         setShowDetailModal(false)
+        setShowCancelModal(false)
+        setCancelReason('')
+        setAppointmentToCancel(null)
       } else {
         alert(data.error || 'Không thể hủy lịch hẹn')
       }
@@ -586,6 +604,105 @@ export default function MyAppointments(){
                   }}
                 >
                   Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ padding: '32px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                <h2 style={{ margin: 0, fontSize: '24px', color: '#1a1a1a' }}>Hủy lịch hẹn</h2>
+                <p style={{ margin: '8px 0 0', color: '#666' }}>Vui lòng cho biết lý do hủy lịch hẹn</p>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#333' }}>
+                  Lý do hủy <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Nhập lý do hủy lịch hẹn..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false)
+                    setCancelReason('')
+                    setAppointmentToCancel(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={confirmCancel}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 15px rgba(220, 53, 69, 0.3)'
+                  }}
+                >
+                  ✕ Xác nhận hủy
                 </button>
               </div>
             </div>

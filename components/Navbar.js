@@ -160,6 +160,26 @@ export default function Navbar() {
             Chuyên khoa
           </Link>
 
+          <Link href="/services" style={{
+            padding: '10px 20px',
+            color: '#1f2937',
+            fontWeight: '500',
+            borderRadius: '8px',
+            transition: 'all 0.3s ease',
+            textDecoration: 'none',
+            fontSize: '15px'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = '#f3f4f6'
+            e.currentTarget.style.color = '#2563eb'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = '#1f2937'
+          }}>
+            Dịch vụ
+          </Link>
+
           <Link href="/doctors" style={{
             padding: '10px 20px',
             color: '#1f2937',
@@ -495,6 +515,31 @@ export default function Navbar() {
                         >
                           <span style={{ fontSize: '18px' }}></span>
                           Quản trị
+                        </Link>
+                        <Link 
+                          href="/admin/services"
+                          onClick={() => setShowDropdown(false)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '14px 16px',
+                            color: '#333',
+                            textDecoration: 'none',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            transition: 'all 0.2s ease',
+                            borderBottom: '1px solid #f0f0f0'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#f9fafb'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'white'
+                          }}
+                        >
+                          <span style={{ fontSize: '18px' }}>🏥</span>
+                          Quản lý dịch vụ
                         </Link>
                         <Link 
                           href="/admin/support"

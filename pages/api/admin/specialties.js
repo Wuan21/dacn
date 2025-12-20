@@ -81,7 +81,7 @@ export default async function handler(req, res) {
 
     try {
       // Check if any doctors have this specialty
-      const doctorCount = await prisma.doctorProfile.count({
+      const doctorCount = await prisma.doctorprofile.count({
         where: { specialtyId }
       })
 

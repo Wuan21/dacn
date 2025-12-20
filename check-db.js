@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function checkDB() {
-  console.log('\n📊 Checking Database...\n');
+  console.log('\nChecking Database...\n');
 
   // Check all users
   const users = await prisma.user.findMany({
@@ -15,7 +15,7 @@ async function checkDB() {
     }
   });
   
-  console.log('👥 Users:');
+  console.log('Users:');
   users.forEach(u => {
     console.log(`  - ID: ${u.id}, Name: ${u.name}, Email: ${u.email}, Role: ${u.role}, Active: ${u.isActive}`);
   });
@@ -32,7 +32,7 @@ async function checkDB() {
     }
   });
 
-  console.log('\n📅 Appointments:');
+  console.log('\nAppointments:');
   appointments.forEach(apt => {
     console.log(`  - ID: ${apt.id}`);
     console.log(`    Patient: ${apt.user_appointment_patientIdTouser.name} (ID: ${apt.patientId})`);
@@ -53,7 +53,7 @@ async function checkDB() {
     }
   });
 
-  console.log('\n👨‍⚕️ Doctors:');
+  console.log('\nDoctors:');
   doctors.forEach(doc => {
     console.log(`  - ID: ${doc.id}, Name: ${doc.name}, Email: ${doc.email}`);
     if (doc.doctorprofile) {

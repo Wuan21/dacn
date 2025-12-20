@@ -12,6 +12,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Find doctor profile by user id
+    const doctorProfile = await prisma.doctorprofile.findFirst({
+      where: { userId: parseInt(doctorId) }
+    })
+
+    if (!doctorProfile) {
+      return res.status(404).json({ error: 'Doctor not found' })
+    }
+
     // Parse date to get start and end of day
     const startOfDay = new Date(date)
     startOfDay.setHours(0, 0, 0, 0)
@@ -22,21 +31,21 @@ export default async function handler(req, res) {
     // Get all booked appointments for this doctor on this date
     const appointments = await prisma.appointment.findMany({
       where: {
-        doctorId: parseInt(doctorId),
-        datetime: {
+        doctorProfileId: doctorProfile.id,
+        appointmentTime: {
           gte: startOfDay,
           lte: endOfDay
         },
         status: { not: 'cancelled' }
       },
       select: {
-        datetime: true
+        appointmentTime: true
       }
     })
 
     // Extract time slots (HH:MM format)
     const bookedSlots = appointments.map(appt => {
-      const date = new Date(appt.datetime)
+      const date = new Date(appt.appointmentTime)
       const hours = date.getHours().toString().padStart(2, '0')
       const minutes = date.getMinutes().toString().padStart(2, '0')
       return `${hours}:${minutes}`

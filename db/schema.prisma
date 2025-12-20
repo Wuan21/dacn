@@ -47,15 +47,16 @@ model DoctorProfile {
 }
 
 model Appointment {
-  id              Int      @id @default(autoincrement())
-  patientId       Int
-  doctorId        Int
-  patient         User     @relation("patient", fields: [patientId], references: [id])
-  doctor          User     @relation("doctor", fields: [doctorId], references: [id])
-  appointmentDate DateTime @map("datetime")
-  status          String   @default("pending")
-  createdAt       DateTime @default(now())
-  medicalRecord   MedicalRecord?
+  id                  Int      @id @default(autoincrement())
+  patientId           Int
+  doctorId            Int
+  patient             User     @relation("patient", fields: [patientId], references: [id])
+  doctor              User     @relation("doctor", fields: [doctorId], references: [id])
+  appointmentDate     DateTime @map("datetime")
+  status              String   @default("pending")
+  cancellationReason  String?  @db.Text
+  createdAt           DateTime @default(now())
+  medicalRecord       MedicalRecord?
 }
 
 model MedicalRecord {

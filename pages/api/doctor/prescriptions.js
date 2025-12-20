@@ -16,6 +16,15 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Forbidden' })
   }
 
+  // Find doctor profile
+  const doctorProfile = await prisma.doctorprofile.findUnique({
+    where: { userId: decoded.userId }
+  })
+
+  if (!doctorProfile) {
+    return res.status(404).json({ error: 'Doctor profile not found' })
+  }
+
   if (req.method === 'POST') {
     const { medicalRecordId, medication, dosage, duration, instructions } = req.body
 
@@ -25,10 +34,10 @@ export default async function handler(req, res) {
 
     try {
       // Verify medical record belongs to this doctor
-      const record = await prisma.medicalRecord.findFirst({
+      const record = await prisma.medicalrecord.findFirst({
         where: {
           id: medicalRecordId,
-          appointment: { doctorId: decoded.userId }
+          appointment: { doctorProfileId: doctorProfile.id }
         }
       })
 
@@ -66,7 +75,7 @@ export default async function handler(req, res) {
         where: {
           id: prescriptionId,
           medicalRecord: {
-            appointment: { doctorId: decoded.userId }
+            appointment: { doctorProfileId: doctorProfile.id }
           }
         }
       })
@@ -106,7 +115,7 @@ export default async function handler(req, res) {
         where: {
           id: prescriptionId,
           medicalRecord: {
-            appointment: { doctorId: decoded.userId }
+            appointment: { doctorProfileId: doctorProfile.id }
           }
         }
       })

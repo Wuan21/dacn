@@ -6,12 +6,15 @@ import Navbar from '../components/Navbar'
 export default function Booking({ doctor }) {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
+  const [symptoms, setSymptoms] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [bookedSlots, setBookedSlots] = useState([])
   const [showPopup, setShowPopup] = useState(false)
   const [popupMessage, setPopupMessage] = useState({ title: '', message: '', type: 'success' })
+  const [services, setServices] = useState([])
+  const [selectedServices, setSelectedServices] = useState([])
   const router = useRouter()
 
   // Generate available time slots
@@ -26,6 +29,7 @@ export default function Booking({ doctor }) {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     setSelectedDate(tomorrow.toISOString().split('T')[0])
+    fetchServices()
   }, [])
 
   // Fetch booked slots when date changes
@@ -47,9 +51,40 @@ export default function Booking({ doctor }) {
     }
   }
 
+  async function fetchServices() {
+    try {
+      const res = await fetch('/api/services?isActive=true')
+      if (res.ok) {
+        const data = await res.json()
+        setServices(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch services:', err)
+    }
+  }
+
   function showPopupMessage(title, message, type = 'success') {
     setPopupMessage({ title, message, type })
     setShowPopup(true)
+  }
+
+  function toggleService(serviceId) {
+    setSelectedServices(prev => {
+      if (prev.includes(serviceId)) {
+        return prev.filter(id => id !== serviceId)
+      } else {
+        return [...prev, serviceId]
+      }
+    })
+  }
+
+  function getTotalPrice() {
+    let total = doctor.fees || 0
+    selectedServices.forEach(serviceId => {
+      const service = services.find(s => s.id === serviceId)
+      if (service) total += service.price
+    })
+    return total
   }
 
   async function handleBooking(e) {
@@ -89,7 +124,9 @@ export default function Booking({ doctor }) {
         credentials: 'include', // Ensure cookies are sent
         body: JSON.stringify({
           doctorId: doctor.id,
-          datetime: datetime.toISOString()
+          datetime: datetime.toISOString(),
+          symptoms: symptoms.trim() || null,
+          serviceIds: selectedServices
         })
       })
 
@@ -304,6 +341,141 @@ export default function Booking({ doctor }) {
                   </p>
                 </div>
 
+                <div className="form-group">
+                  <label>🩺 Triệu chứng</label>
+                  <textarea
+                    value={symptoms}
+                    onChange={e => setSymptoms(e.target.value)}
+                    placeholder="Mô tả triệu chứng hoặc lý do khám bệnh (không bắt buộc)"
+                    rows="4"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #ddd',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                {services.length > 0 && (
+                  <div className="form-group">
+                    <label>🏥 Dịch vụ khám (tùy chọn)</label>
+                    <div style={{ marginTop: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                      {services.map(service => (
+                        <div
+                          key={service.id}
+                          onClick={() => toggleService(service.id)}
+                          style={{
+                            padding: '12px',
+                            border: selectedServices.includes(service.id) ? '2px solid #2563eb' : '1px solid #ddd',
+                            borderRadius: '8px',
+                            marginBottom: '8px',
+                            cursor: 'pointer',
+                            background: selectedServices.includes(service.id) ? '#dbeafe' : 'white',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '20px', marginRight: '8px' }}>
+                                {service.icon || '🩺'}
+                              </span>
+                              <strong style={{ fontSize: '15px' }}>{service.name}</strong>
+                            </div>
+                            {service.description && (
+                              <p style={{ 
+                                fontSize: '13px', 
+                                color: '#666', 
+                                margin: '4px 0 0 28px',
+                                lineHeight: '1.4'
+                              }}>
+                                {service.description.length > 60 
+                                  ? service.description.substring(0, 60) + '...' 
+                                  : service.description}
+                              </p>
+                            )}
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: '#2563eb',
+                              marginTop: '4px',
+                              marginLeft: '28px'
+                            }}>
+                              ⏱️ {service.duration} phút
+                            </div>
+                          </div>
+                          <div style={{ 
+                            fontSize: '15px', 
+                            fontWeight: '600',
+                            color: selectedServices.includes(service.id) ? '#2563eb' : '#333',
+                            marginLeft: '12px'
+                          }}>
+                            {service.price.toLocaleString('vi-VN')}₫
+                          </div>
+                          {selectedServices.includes(service.id) && (
+                            <div style={{ 
+                              marginLeft: '8px',
+                              color: '#2563eb',
+                              fontSize: '20px'
+                            }}>
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(doctor.fees > 0 || selectedServices.length > 0) && (
+                  <div style={{
+                    background: '#f0f9ff',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    border: '2px solid #2563eb'
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#2563eb', marginBottom: '8px' }}>
+                      💰 Chi phí ước tính
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#333', lineHeight: '2' }}>
+                      {doctor.fees > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Phí khám bác sĩ:</span>
+                          <strong>{doctor.fees.toLocaleString('vi-VN')}₫</strong>
+                        </div>
+                      )}
+                      {selectedServices.length > 0 && selectedServices.map(serviceId => {
+                        const service = services.find(s => s.id === serviceId)
+                        return service ? (
+                          <div key={serviceId} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>{service.icon} {service.name}:</span>
+                            <strong>{service.price.toLocaleString('vi-VN')}₫</strong>
+                          </div>
+                        ) : null
+                      })}
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        paddingTop: '8px',
+                        marginTop: '8px',
+                        borderTop: '2px solid #2563eb',
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        color: '#2563eb'
+                      }}>
+                        <span>Tổng cộng:</span>
+                        <span>{getTotalPrice().toLocaleString('vi-VN')}₫</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button type="submit" disabled={loading}>
                   {loading ? 'Đang đặt lịch...' : 'Xác nhận đặt lịch'}
                 </button>
@@ -436,8 +608,7 @@ export async function getServerSideProps({ query }) {
   }
 
   try {
-    const { PrismaClient } = require('@prisma/client')
-    const prisma = new PrismaClient()
+    const prisma = require('../lib/prisma')
     
     const doctor = await prisma.user.findUnique({
       where: { 
@@ -453,13 +624,11 @@ export async function getServerSideProps({ query }) {
       }
     })
 
-    await prisma.$disconnect()
-
     if (!doctor || !doctor.doctorprofile) {
       return { props: { doctor: null } }
     }
 
-    // Format the doctor data
+    // Format the doctor data - convert Decimal to number for JSON serialization
     const formattedDoctor = {
       id: doctor.id,
       name: doctor.name,
@@ -469,7 +638,7 @@ export async function getServerSideProps({ query }) {
       bio: doctor.doctorprofile?.bio || null,
       degree: doctor.doctorprofile?.degree || null,
       experience: doctor.doctorprofile?.experience || null,
-      fees: doctor.doctorprofile?.fees || null
+      fees: doctor.doctorprofile?.fees ? Number(doctor.doctorprofile.fees) : null
     }
     
     return { props: { doctor: formattedDoctor } }

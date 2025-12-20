@@ -2,7 +2,7 @@ import '../styles.css'
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 
-// Disable SSR for ChatWidget because it uses socket.io-client
+// Disable SSR for ChatWidget to avoid hydration issues
 const ChatWidget = dynamic(() => import('../components/ChatWidget'), {
   ssr: false
 })

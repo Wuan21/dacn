@@ -20,33 +20,27 @@ export default async function handler(req, res) {
     const appointments = await prisma.appointment.findMany({
       include: { 
         patient: { select: { id: true, name: true, email: true } },
-        doctor: { 
-          select: { 
-            id: true, 
-            name: true, 
-            email: true,
-            doctorProfile: {
-              select: {
-                specialty: { select: { name: true } }
-              }
-            }
+        doctorProfile: { 
+          include: { 
+            user: { select: { id: true, name: true, email: true } },
+            specialty: { select: { name: true } }
           } 
         }
       },
-      orderBy: { datetime: 'desc' }
+      orderBy: { appointmentTime: 'desc' }
     })
     
-    const result = appts.map(a => ({
+    const result = appointments.map(a => ({
       id: a.id,
-      appointmentDate: a.datetime,
+      appointmentDate: a.appointmentTime,
       status: a.status,
       patientId: a.patient.id,
       patientName: a.patient.name,
       patientEmail: a.patient.email,
-      doctorId: a.doctor.id,
-      doctorName: a.doctor.name,
-      doctorEmail: a.doctor.email,
-      specialtyName: a.doctor.doctorProfile?.specialty?.name || 'N/A',
+      doctorId: a.doctorProfile?.user?.id,
+      doctorName: a.doctorProfile?.user?.name,
+      doctorEmail: a.doctorProfile?.user?.email,
+      specialtyName: a.doctorProfile?.specialty?.name || 'N/A',
       createdAt: a.createdAt
     }))
     

@@ -17,10 +17,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    // Find doctor profile first
+    const doctorProfile = await prisma.doctorprofile.findUnique({
+      where: { userId: decoded.userId }
+    })
+
+    if (!doctorProfile) {
+      return res.status(404).json({ error: 'Doctor profile not found' })
+    }
+
     const appointments = await prisma.appointment.findMany({
-    where: { doctorId: decoded.userId },
+      where: { doctorProfileId: doctorProfile.id },
       include: {
-        medicalRecord: true
+        medicalrecord: true
       }
     })
 
@@ -37,10 +46,10 @@ export default async function handler(req, res) {
       confirmed: appointments.filter(a => a.status === 'confirmed').length,
       completed: appointments.filter(a => a.status === 'completed').length,
       cancelled: appointments.filter(a => a.status === 'cancelled').length,
-      today: appointments.filter(a => new Date(a.appointmentDate).toDateString() === today.toDateString()).length,
-      thisWeek: appointments.filter(a => new Date(a.appointmentDate) >= weekAgo).length,
-      thisMonth: appointments.filter(a => new Date(a.appointmentDate) >= monthAgo).length,
-      withRecords: appointments.filter(a => a.medicalRecord).length,
+      today: appointments.filter(a => new Date(a.appointmentTime).toDateString() === today.toDateString()).length,
+      thisWeek: appointments.filter(a => new Date(a.appointmentTime) >= weekAgo).length,
+      thisMonth: appointments.filter(a => new Date(a.appointmentTime) >= monthAgo).length,
+      withRecords: appointments.filter(a => a.medicalrecord).length,
       uniquePatients: new Set(appointments.map(a => a.patientId)).size
     }
 

@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init",
-    "seed": "node prisma/seed.js"
+    "prisma:migrate": "prisma migrate deploy",
+    "seed": "node prisma/seed.js",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
@@ -18,9 +19,6 @@
     "next": "^13.4.7",
     "prisma": "^5.8.0",
     "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "sqlite3": "^5.1.6"
+    "react-dom": "18.2.0"
   }
 }

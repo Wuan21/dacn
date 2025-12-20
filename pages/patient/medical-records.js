@@ -154,8 +154,8 @@ export default function MedicalRecords(){
           ) : (
             <div style={{ display: 'grid', gap: '20px' }}>
               {filteredRecords.map(record => {
-                const doctor = record.appointment.doctor
-                const specialty = doctor.doctorProfile?.specialty?.name || 'N/A'
+                const doctor = record.appointment?.doctor
+                const specialty = doctor?.doctorProfile?.specialty?.name || 'N/A'
                 
                 return (
                   <div key={record.id} style={{
@@ -186,7 +186,7 @@ export default function MedicalRecords(){
                           </div>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '18px', color: '#1a1a1a', fontWeight: '600', marginBottom: '4px' }}>
-                              Dr. {doctor.name}
+                              Dr. {doctor?.name || 'N/A'}
                             </h3>
                             <div style={{ fontSize: '14px', color: '#667eea', fontWeight: '500' }}>
                               🏥 {specialty}
@@ -196,7 +196,7 @@ export default function MedicalRecords(){
 
                         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '14px', color: '#666', marginBottom: '16px' }}>
                           <div>
-                            📅 {new Date(record.appointment.datetime).toLocaleDateString('vi-VN')}
+                            📅 {record.appointment?.datetime ? new Date(record.appointment.datetime).toLocaleDateString('vi-VN') : 'N/A'}
                           </div>
                           <div>
                             🕐 {new Date(record.appointment.datetime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
@@ -310,9 +310,9 @@ export default function MedicalRecords(){
                   👨‍⚕️ Thông tin bác sĩ
                 </h4>
                 <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.8' }}>
-                  <div><strong>Bác sĩ:</strong> Dr. {selectedRecord.appointment.doctor.name}</div>
-                  <div><strong>Chuyên khoa:</strong> {selectedRecord.appointment.doctor.doctorProfile?.specialty?.name || 'N/A'}</div>
-                  <div><strong>Email:</strong> {selectedRecord.appointment.doctor.email}</div>
+                  <div><strong>Bác sĩ:</strong> Dr. {selectedRecord.appointment?.doctor?.name || 'N/A'}</div>
+                  <div><strong>Chuyên khoa:</strong> {selectedRecord.appointment?.doctor?.doctorProfile?.specialty?.name || 'N/A'}</div>
+                  <div><strong>Email:</strong> {selectedRecord.appointment?.doctor?.email || 'N/A'}</div>
                 </div>
               </div>
 
@@ -322,9 +322,9 @@ export default function MedicalRecords(){
                   📅 Thông tin khám
                 </h4>
                 <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.8' }}>
-                  <div><strong>Ngày khám:</strong> {new Date(selectedRecord.appointment.appointmentDate).toLocaleDateString('vi-VN')}</div>
-                  <div><strong>Giờ khám:</strong> {new Date(selectedRecord.appointment.appointmentDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
-                  <div><strong>Ngày tạo hồ sơ:</strong> {new Date(selectedRecord.createdAt).toLocaleString('vi-VN')}</div>
+                  <div><strong>Ngày khám:</strong> {selectedRecord.appointment?.appointmentDate ? new Date(selectedRecord.appointment.appointmentDate).toLocaleDateString('vi-VN') : 'N/A'}</div>
+                  <div><strong>Giờ khám:</strong> {selectedRecord.appointment?.appointmentDate ? new Date(selectedRecord.appointment.appointmentDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+                  <div><strong>Ngày tạo hồ sơ:</strong> {selectedRecord.createdAt ? new Date(selectedRecord.createdAt).toLocaleString('vi-VN') : 'N/A'}</div>
                 </div>
               </div>
 

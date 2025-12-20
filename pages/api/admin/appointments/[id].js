@@ -1,18 +1,16 @@
-import { PrismaClient } from '@prisma/client'
-import jwt from 'jsonwebtoken'
-
-const prisma = new PrismaClient()
+const prisma = require('../../../../lib/prisma')
+const { getTokenFromReq, verifyToken } = require('../../../../lib/auth')
 
 export default async function handler(req, res) {
   try {
     // Verify admin authentication
-    const token = req.headers.authorization?.split(' ')[1]
+    const token = getTokenFromReq(req)
     
     if (!token) {
       return res.status(401).json({ error: 'Không có quyền truy cập' })
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    const decoded = verifyToken(token)
     
     if (decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Chỉ admin mới có quyền này' })
@@ -34,26 +32,24 @@ export default async function handler(req, res) {
               dateOfBirth: true,
             }
           },
-          doctor: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+          doctorProfile: {
             include: {
-              doctorProfile: {
+              user: {
                 select: {
-                  specialty: {
-                    select: {
-                      id: true,
-                      name: true
-                    }
-                  }
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              },
+              specialty: {
+                select: {
+                  id: true,
+                  name: true
                 }
               }
             }
           },
-          medicalRecord: {
+          medicalrecord: {
             select: {
               id: true,
               diagnosis: true,
@@ -69,14 +65,16 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Không tìm thấy lịch hẹn' })
       }
 
-      // Transform the response to flatten doctor specialty
+      // Transform the response to flatten structure
       const response = {
         ...appointment,
         doctor: {
-          ...appointment.doctor,
-          specialty: appointment.doctor.doctorProfile?.specialty || null,
-          doctorProfile: undefined, // Remove nested structure
-        }
+          id: appointment.doctorProfile?.user?.id,
+          name: appointment.doctorProfile?.user?.name,
+          email: appointment.doctorProfile?.user?.email,
+          specialty: appointment.doctorProfile?.specialty || null,
+        },
+        doctorProfile: undefined, // Remove nested structure
       }
 
       return res.status(200).json(response)
@@ -93,7 +91,7 @@ export default async function handler(req, res) {
       }
 
       // Delete related medical records first (if any)
-      await prisma.medicalRecord.deleteMany({
+      await prisma.medicalrecord.deleteMany({
         where: { appointmentId: parseInt(id) }
       })
 
@@ -114,7 +112,5 @@ export default async function handler(req, res) {
       error: 'Có lỗi xảy ra', 
       details: error.message 
     })
-  } finally {
-    await prisma.$disconnect()
   }
 }

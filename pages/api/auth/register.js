@@ -3,7 +3,7 @@ const { hashPassword } = require('../../../lib/auth')
 
 export default async function handler(req, res){
   if (req.method !== 'POST') return res.status(405).end()
-  const { email, name, password, role } = req.body
+  const { email, name, phone, dateOfBirth, password, role } = req.body
   
   // Validation
   if (!email || !password || !name) {
@@ -20,6 +20,15 @@ export default async function handler(req, res){
     return res.status(400).json({ error: 'Email không hợp lệ' })
   }
 
+  // Validate phone format if provided
+  if (phone) {
+    const phoneRegex = /^[0-9]{10,11}$/
+    const cleanPhone = phone.replace(/\s/g, '')
+    if (!phoneRegex.test(cleanPhone)) {
+      return res.status(400).json({ error: 'Số điện thoại không hợp lệ' })
+    }
+  }
+
   try{
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({ where: { email } })
@@ -32,6 +41,8 @@ export default async function handler(req, res){
       data: { 
         email, 
         name, 
+        phone: phone ? phone.replace(/\s/g, '') : null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         password: hashed, 
         role: role || 'patient',
         isActive: true 
