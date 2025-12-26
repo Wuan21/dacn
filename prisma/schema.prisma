@@ -3,126 +3,120 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model appointment {
-  id              Int                  @id @default(autoincrement())
-  patientId       Int
-  doctorProfileId Int
+  id              String               @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String               @db.ObjectId
+  doctorProfileId String               @db.ObjectId
   appointmentTime DateTime
   status          appointments_status? @default(pending)
-  createdAt       DateTime?            @default(now())
-  patient         user                 @relation(fields: [patientId], references: [id], onDelete: Cascade, map: "appointments_ibfk_1")
-  doctorProfile   doctorprofile        @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade, map: "appointments_ibfk_2")
+  createdAt       DateTime             @default(now())
+  patient         user                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorProfile   doctorprofile        @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
   medicalrecord   medicalrecord?
 
-  @@index([doctorProfileId], map: "doctorProfileId")
-  @@index([patientId], map: "patientId")
   @@map("appointments")
 }
 
 model doctorprofile {
-  id              Int               @id @default(autoincrement())
-  userId          Int               @unique(map: "userId")
-  specialtyId     Int
-  bio             String?           @db.Text
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String            @unique @db.ObjectId
+  specialtyId     String            @db.ObjectId
+  bio             String?
   degree          String?
   experience      String?
-  fees            Decimal?          @db.Decimal(10, 2)
+  fees            Float?
   address1        String?
   address2        String?
-  profileImage    String?           @db.LongText
+  profileImage    String?
   appointments    appointment[]
   doctorschedules doctorschedule[]
-  user            user              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "DoctorProfile_userId_fkey")
-  specialty       specialty         @relation(fields: [specialtyId], references: [id], map: "DoctorProfile_specialtyId_fkey")
+  user            user              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty       specialty         @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
 
-  @@index([specialtyId], map: "specialtyId")
   @@map("doctor_profiles")
 }
 
 model medicalrecord {
-  id            Int            @id @default(autoincrement())
-  appointmentId Int            @unique(map: "appointmentId")
-  diagnosis     String         @db.Text
-  symptoms      String?        @db.Text
-  notes         String?        @db.Text
-  createdAt     DateTime?      @default(now())
-  appointment   appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade, map: "MedicalRecord_appointmentId_fkey")
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentId String         @unique @db.ObjectId
+  diagnosis     String
+  symptoms      String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  appointment   appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   prescription  prescription[]
 
   @@map("medical_records")
 }
 
 model prescription {
-  id              Int           @id @default(autoincrement())
-  medicalRecordId Int
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  medicalRecordId String        @db.ObjectId
   medication      String
   dosage          String?
   duration        String?
-  instructions    String?       @db.Text
-  createdAt       DateTime?     @default(now())
-  medicalrecord   medicalrecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade, map: "Prescription_medicalRecordId_fkey")
+  instructions    String?
+  createdAt       DateTime      @default(now())
+  medicalrecord   medicalrecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
 
-  @@index([medicalRecordId], map: "medicalRecordId")
   @@map("prescriptions")
 }
 
 model specialty {
-  id            Int             @id @default(autoincrement())
-  name          String          @unique(map: "name")
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  name          String          @unique
   doctorprofile doctorprofile[]
 
   @@map("specialties")
 }
 
 model doctorschedule {
-  id              Int           @id @default(autoincrement())
-  doctorProfileId Int
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  doctorProfileId String        @db.ObjectId
   dayOfWeek       Int           // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   shift           String        // 'morning', 'afternoon', 'evening'
   startTime       String        // '08:00'
   endTime         String        // '12:00'
   isAvailable     Boolean       @default(true)
   weekStartDate   DateTime?     // Ngày bắt đầu tuần (để quản lý theo tuần cụ thể)
-  createdAt       DateTime?     @default(now())
-  updatedAt       DateTime?     @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   doctorProfile   doctorprofile @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
 
-  @@unique([doctorProfileId, dayOfWeek, shift, weekStartDate])
-  @@index([doctorProfileId], map: "doctorschedule_doctorProfileId")
   @@map("doctor_schedules")
 }
 
 model service {
-  id          Int       @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
-  description String?   @db.Text
-  price       Decimal   @db.Decimal(10, 2)
+  description String?
+  price       Float
   duration    Int
   category    String?
-  icon        String?   @db.VarChar(50)
-  isActive    Boolean?  @default(true)
-  createdAt   DateTime? @default(now())
+  icon        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   @@map("services")
 }
 
 model user {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique(map: "email")
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  email         String         @unique
   name          String?
   password      String
   role          users_role     @default(patient)
-  isActive      Boolean?       @default(true)
+  isActive      Boolean        @default(true)
   phone         String?
   address       String?
   dateOfBirth   DateTime?
   gender        users_gender?
-  profileImage  String?        @db.LongText
-  createdAt     DateTime?      @default(now())
+  profileImage  String?
+  createdAt     DateTime       @default(now())
   appointments  appointment[]
   doctorprofile doctorprofile?
 

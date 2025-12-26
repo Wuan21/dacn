@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
     "seed": "node prisma/seed.js",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
-    "render-build": "npm install && prisma generate && prisma migrate deploy && npm run build"
+    "vercel-build": "prisma generate && prisma db push && next build",
+    "render-build": "npm install && prisma generate && prisma db push && npm run build"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",

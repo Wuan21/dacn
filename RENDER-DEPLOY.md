@@ -1,23 +1,24 @@
 # Hướng Dẫn Deploy Lên Render
 
-## Bước 1: Chuẩn Bị Database (MySQL)
+## Bước 1: Chuẩn Bị Database (MongoDB)
 
-Vì Render không cung cấp MySQL miễn phí, bạn có 2 lựa chọn:
+### ✅ Sử dụng MongoDB Atlas (Miễn phí - Đã có sẵn)
 
-### Tùy Chọn A: Sử dụng PlanetScale (Khuyến nghị - Miễn phí)
-1. Truy cập [PlanetScale](https://planetscale.com/)
-2. Đăng ký tài khoản miễn phí
-3. Tạo database mới
-4. Lấy connection string (DATABASE_URL)
+Bạn đã có cluster **DACN** trên MongoDB Atlas! Chỉ cần lấy connection string:
 
-### Tùy Chọn B: Sử dụng Railway (Có free tier)
-1. Truy cập [Railway](https://railway.app/)
-2. Đăng nhập bằng GitHub
-3. Tạo MySQL database
-4. Copy DATABASE_URL từ dashboard
-
-### Tùy Chọn C: Sử dụng Render MySQL (Trả phí)
-1. Tạo MySQL database trên Render (từ $7/tháng)
+1. Vào MongoDB Atlas: https://cloud.mongodb.com/
+2. Click vào cluster "DACN"
+3. Click nút "Connect"
+4. Chọn "Connect your application"
+5. Copy connection string, format:
+   ```
+   mongodb+srv://qn21012004_db_user:<password>@dacn.tuj4ekw.mongodb.net/?retryWrites=true&w=majority
+   ```
+6. Thay `<password>` bằng password thật của bạn
+7. Thêm tên database vào sau `mongodb.net/`:
+   ```
+   mongodb+srv://qn21012004_db_user:YOUR_PASSWORD@dacn.tuj4ekw.mongodb.net/yourmedicare?retryWrites=true&w=majority
+   ```
 
 ## Bước 2: Push Code Lên GitHub
 
@@ -73,7 +74,7 @@ git push -u origin main
    ```
    
    **Quan trọng:**
-   - `DATABASE_URL`: Lấy từ PlanetScale/Railway/Render MySQL
+   - `DATABASE_URL`: Connection string MongoDB từ Atlas (format phía trên)
    - `JWT_SECRET`: Tạo một chuỗi ngẫu nhiên mạnh (ít nhất 32 ký tự)
 
 5. **Deploy**
@@ -91,16 +92,18 @@ Nếu bạn muốn sử dụng file `render.yaml` đã tạo:
 4. Render sẽ tự động đọc file `render.yaml`
 5. Thêm Environment Variables như ở Cách 1
 
-## Bước 4: Migrate Database (Lần Đầu)
+## Bước 4: Push Schema To MongoDB (Lần Đầu)
 
-Sau khi deploy thành công, bạn cần chạy migrations:
+Sau khi deploy thành công, bạn cần push schema lên MongoDB:
 
 1. Vào Render Dashboard → Web Service của bạn
 2. Click tab "Shell"
 3. Chạy lệnh:
    ```bash
-   npx prisma migrate deploy
+   npx prisma db push
    ```
+
+**Lưu ý:** MongoDB không dùng migrations như MySQL, chỉ cần `db push`.
 
 ## Bước 5: Seed Data (Tùy chọn)
 
@@ -132,8 +135,10 @@ npm run seed
 - Đổi `JWT_SECRET` thành giá trị mạnh và duy nhất
 
 ### 🗄️ Database Connection
-- PlanetScale sử dụng SSL connection, connection string có thể cần thêm `?sslaccept=strict`
-- Ví dụ: `mysql://user:pass@host/db?sslaccept=strict`
+- MongoDB Atlas connection string format:
+  ```
+  mongodb+srv://user:pass@cluster.mongodb.net/database?retryWrites=true&w=majority
+  ```
 
 ### 📝 Cập Nhật Code
 Mỗi khi bạn push code mới lên GitHub:
@@ -168,7 +173,7 @@ Mỗi khi bạn push code mới lên GitHub:
 
 ### Free Setup (Khuyến nghị để test)
 - Render Web Service: Free (750 giờ/tháng)
-- PlanetScale MySQL: Free (1 database, 5GB storage)
+- MongoDB Atlas: Free (512MB storage, shared cluster)
 - **Tổng: $0/tháng**
 
 ### Paid Setup (Production)
