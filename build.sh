@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh - Render build script for MongoDB
+# build.sh - Render build script
 
 # Exit on error
 set -o errexit
@@ -10,8 +10,8 @@ npm install
 # Generate Prisma Client
 npx prisma generate
 
-# Push database schema to MongoDB (no migrations needed)
-npx prisma db push
+# Run database migrations
+npx prisma migrate deploy
 
 # Build Next.js application
 npm run build
