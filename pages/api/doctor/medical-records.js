@@ -85,6 +85,14 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Appointment not found' })
       }
 
+      // Kiểm tra xem cuộc hẹn đã được xác nhận đã khám chưa
+      if (appointment.status !== 'completed') {
+        return res.status(400).json({ 
+          error: 'Vui lòng xác nhận trạng thái "Đã khám" trước khi tạo hồ sơ bệnh án',
+          currentStatus: appointment.status
+        })
+      }
+
       // Check if medical record already exists
       const existing = await prisma.medicalrecord.findUnique({
         where: { appointmentId }

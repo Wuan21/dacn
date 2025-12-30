@@ -15,14 +15,11 @@ export default function Booking({ doctor }) {
   const [popupMessage, setPopupMessage] = useState({ title: '', message: '', type: 'success' })
   const [services, setServices] = useState([])
   const [selectedServices, setSelectedServices] = useState([])
+  const [packages, setPackages] = useState([])
+  const [selectedPackage, setSelectedPackage] = useState(null)
+  const [availableSlots, setAvailableSlots] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
   const router = useRouter()
-
-  // Generate available time slots
-  const timeSlots = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-    '11:00', '11:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00'
-  ]
 
   // Set default date to tomorrow
   useEffect(() => {
@@ -30,24 +27,55 @@ export default function Booking({ doctor }) {
     tomorrow.setDate(tomorrow.getDate() + 1)
     setSelectedDate(tomorrow.toISOString().split('T')[0])
     fetchServices()
+    fetchPackages()
   }, [])
 
-  // Fetch booked slots when date changes
+  // Fetch available slots from doctor's work schedule when date changes
   useEffect(() => {
     if (selectedDate && doctor) {
-      fetchBookedSlots()
+      fetchAvailableSlots()
     }
   }, [selectedDate, doctor])
 
-  async function fetchBookedSlots() {
+  async function fetchAvailableSlots() {
+    setLoadingSlots(true)
     try {
-      const res = await fetch(`/api/appointments/booked-slots?doctorId=${doctor.id}&date=${selectedDate}`)
+      // Fetch slots từ API public (không cần authentication)
+      // Truyền doctorProfileId thay vì userId
+      const res = await fetch(`/api/doctors/${doctor.doctorProfileId}/slots?date=${selectedDate}`)
+      
       if (res.ok) {
         const data = await res.json()
-        setBookedSlots(data.bookedSlots || [])
+        
+        // Flatten all slots từ các ca làm việc
+        const allSlots = []
+        if (data.schedules && data.schedules.length > 0) {
+          data.schedules.forEach(schedule => {
+            schedule.slots.forEach(slot => {
+              allSlots.push({
+                time: slot.startTime,
+                isBooked: slot.isBooked,
+                shift: schedule.shift
+              })
+            })
+          })
+        }
+        
+        setAvailableSlots(allSlots)
+        
+        // Cập nhật bookedSlots cho checking
+        const booked = allSlots.filter(s => s.isBooked).map(s => s.time)
+        setBookedSlots(booked)
+      } else {
+        setAvailableSlots([])
+        setBookedSlots([])
       }
     } catch (err) {
-      console.error('Failed to fetch booked slots:', err)
+      console.error('Failed to fetch available slots:', err)
+      setAvailableSlots([])
+      setBookedSlots([])
+    } finally {
+      setLoadingSlots(false)
     }
   }
 
@@ -63,27 +91,55 @@ export default function Booking({ doctor }) {
     }
   }
 
+  async function fetchPackages() {
+    try {
+      const res = await fetch('/api/services/packages?isActive=true')
+      if (res.ok) {
+        const data = await res.json()
+        setPackages(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch packages:', err)
+    }
+  }
+
   function showPopupMessage(title, message, type = 'success') {
     setPopupMessage({ title, message, type })
     setShowPopup(true)
   }
 
+  function formatPrice(price) {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(price)
+  }
+
   function toggleService(serviceId) {
-    setSelectedServices(prev => {
-      if (prev.includes(serviceId)) {
-        return prev.filter(id => id !== serviceId)
-      } else {
-        return [...prev, serviceId]
-      }
-    })
+    if (selectedServices.includes(serviceId)) {
+      setSelectedServices(selectedServices.filter(id => id !== serviceId))
+    } else {
+      setSelectedServices([...selectedServices, serviceId])
+    }
   }
 
   function getTotalPrice() {
     let total = doctor.fees || 0
-    selectedServices.forEach(serviceId => {
-      const service = services.find(s => s.id === serviceId)
-      if (service) total += service.price
-    })
+    
+    // Add package price if selected
+    if (selectedPackage) {
+      const pkg = packages.find(p => p.id === selectedPackage)
+      if (pkg) total += parseFloat(pkg.price)
+    }
+    
+    // Add individual services only if no package selected
+    if (!selectedPackage) {
+      selectedServices.forEach(serviceId => {
+        const service = services.find(s => s.id === serviceId)
+        if (service) total += service.price
+      })
+    }
+    
     return total
   }
 
@@ -123,7 +179,7 @@ export default function Booking({ doctor }) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // Ensure cookies are sent
         body: JSON.stringify({
-          doctorId: doctor.id,
+          doctorProfileId: doctor.doctorProfileId,
           datetime: datetime.toISOString(),
           symptoms: symptoms.trim() || null,
           serviceIds: selectedServices
@@ -144,7 +200,12 @@ export default function Booking({ doctor }) {
           setTimeout(() => router.push('/login'), 2000)
         } else if (res.status === 409) {
           showPopupMessage('Khung giờ đã được đặt', data.error || 'Khung giờ này đã có người đặt. Vui lòng chọn giờ khác.', 'error')
-          fetchBookedSlots() // Refresh booked slots
+          fetchAvailableSlots() // Refresh available slots
+        } else if (res.status === 400) {
+          showPopupMessage('Lỗi', data.error || 'Thông tin đặt lịch không hợp lệ', 'error')
+          if (data.error && data.error.includes('lịch làm việc')) {
+            fetchAvailableSlots() // Refresh if schedule issue
+          }
         } else {
           showPopupMessage('Lỗi', data.error || 'Đặt lịch thất bại. Vui lòng thử lại.', 'error')
         }
@@ -274,72 +335,230 @@ export default function Booking({ doctor }) {
 
                 <div className="form-group">
                   <label>🕐 Chọn giờ khám</label>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(4, 1fr)', 
-                    gap: '8px',
-                    marginTop: '8px'
-                  }}>
-                    {timeSlots.map(time => {
-                      // Check if this time is in the past for today
-                      const isToday = selectedDate === new Date().toISOString().split('T')[0]
-                      const currentTime = new Date().toTimeString().slice(0, 5)
-                      const isPast = isToday && time < currentTime
-                      
-                      // Check if this slot is already booked
-                      const isBooked = bookedSlots.includes(time)
-                      const isDisabled = isPast || isBooked
-                      
-                      return (
-                        <button
-                          key={time}
-                          type="button"
-                          onClick={() => !isDisabled && setSelectedTime(time)}
-                          disabled={isDisabled}
+                  
+                  {loadingSlots ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                      Đang tải lịch khám...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div style={{ 
+                      padding: '20px', 
+                      background: '#fef3c7', 
+                      border: '1px solid #fbbf24',
+                      borderRadius: '8px',
+                      color: '#92400e',
+                      textAlign: 'center'
+                    }}>
+                      Bác sĩ không có lịch làm việc trong ngày này. Vui lòng chọn ngày khác.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(4, 1fr)', 
+                        gap: '8px',
+                        marginTop: '8px'
+                      }}>
+                        {availableSlots.map(slot => {
+                          // Check if this time is in the past for today
+                          const isToday = selectedDate === new Date().toISOString().split('T')[0]
+                          const currentTime = new Date().toTimeString().slice(0, 5)
+                          const isPast = isToday && slot.time < currentTime
+                          
+                          const isDisabled = isPast || slot.isBooked
+                          
+                          return (
+                            <button
+                              key={slot.time}
+                              type="button"
+                              onClick={() => !isDisabled && setSelectedTime(slot.time)}
+                              disabled={isDisabled}
+                              style={{
+                                padding: '10px',
+                                border: selectedTime === slot.time 
+                                  ? '2px solid #2563eb' 
+                                  : '1px solid #ddd',
+                                background: isDisabled 
+                                  ? '#e5e7eb'
+                                  : selectedTime === slot.time 
+                                    ? '#dbeafe' 
+                                    : 'white',
+                                color: isDisabled
+                                  ? '#9ca3af'
+                                  : selectedTime === slot.time 
+                                    ? '#2563eb' 
+                                    : '#333',
+                                borderRadius: '8px',
+                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                fontSize: '14px',
+                                fontWeight: selectedTime === slot.time ? '600' : '400',
+                                transition: 'all 0.2s ease',
+                                opacity: isDisabled ? 0.6 : 1,
+                                position: 'relative'
+                              }}
+                            >
+                              {slot.time}
+                              {slot.isBooked && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '2px',
+                                  right: '2px',
+                                  width: '6px',
+                                  height: '6px',
+                                  background: '#dc2626',
+                                  borderRadius: '50%'
+                                }} />
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '12px', marginBottom: 0, lineHeight: '1.6' }}>
+                        💡 Khung giờ xám là giờ đã có người đặt, bạn vui lòng đặt khung giờ khác
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {/* Package Selection */}
+                {packages.length > 0 && (
+                  <div className="form-group">
+                    <label>📦 Gói khám (tùy chọn)</label>
+                    <p style={{ fontSize: '13px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+                      Chọn gói khám để được ưu đãi. Nếu chọn gói khám, bạn không thể chọn thêm dịch vụ đơn lẻ.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                      {packages.map(pkg => (
+                        <div
+                          key={pkg.id}
+                          onClick={() => {
+                            setSelectedPackage(selectedPackage === pkg.id ? null : pkg.id)
+                            if (selectedPackage !== pkg.id) {
+                              setSelectedServices([]) // Clear selected services when selecting a package
+                            }
+                          }}
                           style={{
-                            padding: '10px',
-                            border: selectedTime === time 
-                              ? '2px solid #2563eb' 
-                              : '1px solid #ddd',
-                            background: isDisabled 
-                              ? '#e5e7eb'
-                              : selectedTime === time 
-                                ? '#dbeafe' 
-                                : 'white',
-                            color: isDisabled
-                              ? '#9ca3af'
-                              : selectedTime === time 
-                                ? '#2563eb' 
-                                : '#333',
-                            borderRadius: '8px',
-                            cursor: isDisabled ? 'not-allowed' : 'pointer',
-                            fontSize: '14px',
-                            fontWeight: selectedTime === time ? '600' : '400',
+                            padding: '16px',
+                            border: selectedPackage === pkg.id ? '2px solid #0d9488' : '1px solid #e5e7eb',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            background: selectedPackage === pkg.id ? '#f0fdfa' : 'white',
                             transition: 'all 0.2s ease',
-                            opacity: isDisabled ? 0.6 : 1,
                             position: 'relative'
                           }}
                         >
-                          {time}
-                          {isBooked && (
+                          {/* Popular Badge */}
+                          {pkg.isPopular && (
                             <div style={{
                               position: 'absolute',
-                              top: '2px',
-                              right: '2px',
-                              width: '6px',
-                              height: '6px',
-                              background: '#dc2626',
-                              borderRadius: '50%'
-                            }} />
+                              top: '8px',
+                              right: '8px',
+                              background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                              color: 'white',
+                              padding: '4px 8px',
+                              borderRadius: '12px',
+                              fontSize: '10px',
+                              fontWeight: '600'
+                            }}>
+                              ⭐ Phổ biến
+                            </div>
                           )}
-                        </button>
-                      )
-                    })}
+                          
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{
+                              width: '48px',
+                              height: '48px',
+                              background: 'linear-gradient(135deg, #0d9488, #0891b2)',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '24px',
+                              flexShrink: 0
+                            }}>
+                              {pkg.icon || '📦'}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                fontWeight: '600',
+                                color: '#1f2937',
+                                marginBottom: '4px',
+                                fontSize: '15px'
+                              }}>
+                                {pkg.name}
+                              </div>
+                              <div style={{
+                                fontSize: '13px',
+                                color: '#6b7280',
+                                marginBottom: '8px',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}>
+                                {pkg.description}
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                paddingTop: '8px',
+                                borderTop: '1px solid #e5e7eb'
+                              }}>
+                                <div style={{
+                                  fontSize: '16px',
+                                  fontWeight: '700',
+                                  color: '#0d9488'
+                                }}>
+                                  {formatPrice(pkg.price)}
+                                </div>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: '#6b7280',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  ⏱️ {pkg.duration}p
+                                </div>
+                              </div>
+                              <div style={{
+                                marginTop: '8px',
+                                padding: '6px 8px',
+                                background: '#f0fdfa',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                color: '#0d9488',
+                                fontWeight: '600'
+                              }}>
+                                ✓ {pkg.items?.length || 0} hạng mục khám
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {selectedPackage === pkg.id && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '8px',
+                              left: '8px',
+                              width: '24px',
+                              height: '24px',
+                              background: '#0d9488',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              fontSize: '14px'
+                            }}>
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <p style={{ fontSize: '13px', color: '#666', marginTop: '12px', marginBottom: 0, lineHeight: '1.6' }}>
-                    💡 Khung giờ xám là giờ đã có người đặt, bạn vui lòng đặt khung giờ khác
-                  </p>
-                </div>
+                )}
 
                 <div className="form-group">
                   <label>🩺 Triệu chứng</label>
@@ -360,9 +579,12 @@ export default function Booking({ doctor }) {
                   />
                 </div>
 
-                {services.length > 0 && (
+                {services.length > 0 && !selectedPackage && (
                   <div className="form-group">
                     <label>🏥 Dịch vụ khám (tùy chọn)</label>
+                    <p style={{ fontSize: '13px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+                      Chọn các dịch vụ đơn lẻ nếu không chọn gói khám.
+                    </p>
                     <div style={{ marginTop: '12px', maxHeight: '300px', overflowY: 'auto' }}>
                       {services.map(service => (
                         <div
@@ -415,7 +637,7 @@ export default function Booking({ doctor }) {
                             color: selectedServices.includes(service.id) ? '#2563eb' : '#333',
                             marginLeft: '12px'
                           }}>
-                            {service.price.toLocaleString('vi-VN')}₫
+                            {formatPrice(service.price)}
                           </div>
                           {selectedServices.includes(service.id) && (
                             <div style={{ 
@@ -441,13 +663,13 @@ export default function Booking({ doctor }) {
                     border: '2px solid #2563eb'
                   }}>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#2563eb', marginBottom: '8px' }}>
-                      💰 Chi phí ước tính
+                    Chi phí ước tính
                     </div>
                     <div style={{ fontSize: '14px', color: '#333', lineHeight: '2' }}>
                       {doctor.fees > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span>Phí khám bác sĩ:</span>
-                          <strong>{doctor.fees.toLocaleString('vi-VN')}₫</strong>
+                          <strong>{formatPrice(doctor.fees)}</strong>
                         </div>
                       )}
                       {selectedServices.length > 0 && selectedServices.map(serviceId => {
@@ -455,7 +677,7 @@ export default function Booking({ doctor }) {
                         return service ? (
                           <div key={serviceId} style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>{service.icon} {service.name}:</span>
-                            <strong>{service.price.toLocaleString('vi-VN')}₫</strong>
+                            <strong>{formatPrice(service.price)}</strong>
                           </div>
                         ) : null
                       })}
@@ -470,7 +692,7 @@ export default function Booking({ doctor }) {
                         color: '#2563eb'
                       }}>
                         <span>Tổng cộng:</span>
-                        <span>{getTotalPrice().toLocaleString('vi-VN')}₫</span>
+                        <span>{formatPrice(getTotalPrice())}</span>
                       </div>
                     </div>
                   </div>
@@ -631,6 +853,7 @@ export async function getServerSideProps({ query }) {
     // Format the doctor data - convert Decimal to number for JSON serialization
     const formattedDoctor = {
       id: doctor.id,
+      doctorProfileId: doctor.doctorprofile?.id || null,
       name: doctor.name,
       email: doctor.email,
       profileImage: doctor.doctorprofile?.profileImage || null,

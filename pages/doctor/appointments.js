@@ -60,7 +60,12 @@ export default function DoctorAppointments(){
       const res = await fetch('/api/doctor/appointments')
       if (res.ok) {
         const data = await res.json()
-        setAppointments(data)
+        // Sửa lại tên field từ appointmentDate thành datetime
+        const formattedData = data.map(apt => ({
+          ...apt,
+          appointmentDate: apt.datetime || apt.appointmentDate
+        }))
+        setAppointments(formattedData)
       }
     } catch (err) {
       console.error(err)
@@ -86,13 +91,22 @@ export default function DoctorAppointments(){
   }
 
   function openMedicalRecordModal(appointment) {
+    // Kiểm tra xem đã đến giờ khám chưa
+    const appointmentTime = new Date(appointment.datetime)
+    const now = new Date()
+    
+    if (appointmentTime > now && !appointment.medicalRecord) {
+      alert('Chưa đến giờ khám. Bạn chỉ có thể tạo hồ sơ khám sau khi đến giờ hẹn.')
+      return
+    }
+    
     setSelectedAppointment(appointment)
     if (appointment.medicalRecord) {
       setMedicalForm({
         diagnosis: appointment.medicalRecord.diagnosis,
         symptoms: appointment.medicalRecord.symptoms || '',
         notes: appointment.medicalRecord.notes || '',
-        prescriptions: appointment.medicalRecord.prescriptions || []
+        prescriptions: appointment.medicalRecord.prescription || []
       })
     } else {
       setMedicalForm({
@@ -420,22 +434,52 @@ export default function DoctorAppointments(){
                   )}
 
                   {(a.status === 'confirmed' || a.status === 'completed') && (
-                    <button
-                      onClick={() => openMedicalRecordModal(a)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: a.medicalRecord ? '#3b82f6' : '#2563eb',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: '500',
-                        fontSize: '14px'
-                      }}
-                    >
-                      {a.medicalRecord ? '📋 Xem hồ sơ khám' : '➕ Tạo hồ sơ khám'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          const appointmentTime = new Date(a.datetime)
+                          const now = new Date()
+                          if (appointmentTime <= now && a.status === 'confirmed') {
+                            updateStatus(a.id, 'completed')
+                          }
+                        }}
+                        disabled={a.status === 'completed' || new Date(a.datetime) > new Date()}
+                        style={{
+                          flex: 1,
+                          minWidth: '120px',
+                          padding: '10px',
+                          background: a.status === 'completed' ? '#9ca3af' : (new Date(a.datetime) > new Date() ? '#d1d5db' : '#10b981'),
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: a.status === 'completed' || new Date(a.datetime) > new Date() ? 'not-allowed' : 'pointer',
+                          fontWeight: '500',
+                          fontSize: '14px',
+                          opacity: a.status === 'completed' || new Date(a.datetime) > new Date() ? 0.6 : 1
+                        }}
+                      >
+                        {a.status === 'completed' ? '✓ Đã khám' : '✓ Xác nhận đã khám'}
+                      </button>
+                      <button
+                        onClick={() => openMedicalRecordModal(a)}
+                        disabled={a.status !== 'completed' && !a.medicalRecord}
+                        style={{
+                          flex: 1,
+                          minWidth: '120px',
+                          padding: '10px',
+                          background: a.medicalRecord ? '#3b82f6' : (a.status === 'completed' ? '#2563eb' : '#d1d5db'),
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: (a.status === 'completed' || a.medicalRecord) ? 'pointer' : 'not-allowed',
+                          fontWeight: '500',
+                          fontSize: '14px',
+                          opacity: (a.status === 'completed' || a.medicalRecord) ? 1 : 0.6
+                        }}
+                      >
+                        {a.medicalRecord ? '📋 Xem hồ sơ khám' : '➕ Tạo hồ sơ khám'}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

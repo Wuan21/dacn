@@ -4,57 +4,39 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
 export default function Services() {
-  const [services, setServices] = useState([])
+  const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedService, setSelectedService] = useState(null)
+  const [selectedPackage, setSelectedPackage] = useState(null)
   const router = useRouter()
 
-  const categories = [
-    { id: 'all', name: 'Tất cả', icon: '🏥', color: '#0d9488' },
-    { id: 'Khám chuyên khoa', name: 'Khám chuyên khoa', icon: '👨‍⚕️', color: '#7c3aed' },
-    { id: 'Xét nghiệm', name: 'Xét nghiệm', icon: '🔬', color: '#dc2626' },
-    { id: 'Chẩn đoán hình ảnh', name: 'Chẩn đoán hình ảnh', icon: '📷', color: '#ea580c' },
-    { id: 'Thủ thuật', name: 'Thủ thuật', icon: '💉', color: '#2563eb' }
-  ]
-
-  const categoryIcons = {
-    'Khám chuyên khoa': '👨‍⚕️',
-    'Xét nghiệm': '🔬',
-    'Chẩn đoán hình ảnh': '📷',
-    'Thủ thuật': '💉',
-    'Khám tổng quát': '🩺',
-    'Tư vấn': '💬'
-  }
-
   useEffect(() => {
-    fetchServices()
+    fetchPackages()
   }, [])
 
-  async function fetchServices() {
+  async function fetchPackages() {
     try {
       setLoading(true)
-      const res = await fetch('/api/services?isActive=true')
+      const res = await fetch('/api/services/packages?isActive=true')
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setServices(data)
+      setPackages(data)
       setError(null)
     } catch (error) {
-      console.error('Error fetching services:', error)
-      setError('Không thể tải danh sách dịch vụ')
+      console.error('Error fetching packages:', error)
+      setError('Không thể tải danh sách gói khám')
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredServices = services.filter(service => {
-    const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory
-    const matchesSearch = !searchTerm || 
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
+  const filteredPackages = packages.filter(pkg => {
+    if (!searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    return pkg.name.toLowerCase().includes(search) ||
+           pkg.description?.toLowerCase().includes(search) ||
+           pkg.items?.some(item => item.name.toLowerCase().includes(search))
   })
 
   const formatPrice = (price) => {
@@ -64,13 +46,21 @@ export default function Services() {
     }).format(price)
   }
 
-  const getServiceIcon = (service) => {
-    return service.icon || categoryIcons[service.category] || '🏥'
+  const groupItemsByCategory = (items) => {
+    const grouped = {}
+    items.forEach(item => {
+      const cat = item.category || 'Khác'
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push(item)
+    })
+    return grouped
   }
 
-  const getCategoryColor = (category) => {
-    const cat = categories.find(c => c.id === category)
-    return cat?.color || '#0d9488'
+  const categoryIcons = {
+    'Khám lâm sàng': '👨‍⚕️',
+    'Xét nghiệm': '🔬',
+    'Chẩn đoán hình ảnh': '📷',
+    'Khác': '📋'
   }
 
   return (
@@ -84,7 +74,6 @@ export default function Services() {
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Background decorations */}
         <div style={{
           position: 'absolute',
           top: '-50px',
@@ -112,7 +101,7 @@ export default function Services() {
               marginBottom: '16px',
               textShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
-              Dịch Vụ Y Tế Chất Lượng Cao
+              Gói Khám Sức Khỏe
             </h1>
             <p style={{ 
               fontSize: '18px', 
@@ -121,7 +110,7 @@ export default function Services() {
               maxWidth: '600px',
               margin: '0 auto 32px'
             }}>
-              Đội ngũ bác sĩ chuyên môn cao, trang thiết bị hiện đại, phục vụ tận tâm 24/7
+              Gói khám toàn diện với đội ngũ bác sĩ chuyên môn cao, trang thiết bị hiện đại
             </p>
             
             {/* Search Box */}
@@ -132,7 +121,7 @@ export default function Services() {
             }}>
               <input
                 type="text"
-                placeholder="Tìm kiếm dịch vụ (VD: Khám tim mạch, Xét nghiệm máu...)"
+                placeholder="Tìm kiếm gói khám (VD: Gói khám tổng quát, Xét nghiệm máu...)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -164,7 +153,7 @@ export default function Services() {
               flexWrap: 'wrap'
             }}>
               {[
-                { num: '50+', label: 'Dịch vụ' },
+                { num: '4+', label: 'Gói khám' },
                 { num: '100+', label: 'Bác sĩ' },
                 { num: '24/7', label: 'Hỗ trợ' }
               ].map((stat, i) => (
@@ -178,55 +167,7 @@ export default function Services() {
         </div>
       </section>
 
-      {/* Category Filter */}
-      <section style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px' }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
-            overflowX: 'auto',
-            paddingBottom: '4px'
-          }}>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 24px',
-                  borderRadius: '50px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.3s ease',
-                  background: selectedCategory === cat.id 
-                    ? `linear-gradient(135deg, ${cat.color}, ${cat.color}dd)` 
-                    : '#f3f4f6',
-                  color: selectedCategory === cat.id ? 'white' : '#374151',
-                  boxShadow: selectedCategory === cat.id ? '0 4px 15px rgba(0,0,0,0.2)' : 'none',
-                  transform: selectedCategory === cat.id ? 'scale(1.05)' : 'scale(1)'
-                }}
-              >
-                <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                <span>{cat.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Services Grid */}
+      {/* Packages Grid */}
       <section style={{ padding: '48px 0 80px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
           {loading ? (
@@ -240,7 +181,7 @@ export default function Services() {
                 animation: 'spin 1s linear infinite',
                 margin: '0 auto 20px'
               }}></div>
-              <p style={{ color: '#6b7280', fontSize: '16px' }}>Đang tải dịch vụ...</p>
+              <p style={{ color: '#6b7280', fontSize: '16px' }}>Đang tải gói khám...</p>
             </div>
           ) : error ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
@@ -258,7 +199,7 @@ export default function Services() {
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>Có lỗi xảy ra</h3>
               <p style={{ color: '#6b7280', marginBottom: '20px' }}>{error}</p>
               <button
-                onClick={fetchServices}
+                onClick={fetchPackages}
                 style={{
                   padding: '12px 24px',
                   background: '#0d9488',
@@ -272,7 +213,7 @@ export default function Services() {
                 Thử lại
               </button>
             </div>
-          ) : filteredServices.length === 0 ? (
+          ) : filteredPackages.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
               <div style={{
                 width: '80px',
@@ -285,269 +226,215 @@ export default function Services() {
                 margin: '0 auto 20px',
                 fontSize: '36px'
               }}>🔍</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>Không tìm thấy dịch vụ</h3>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>Không tìm thấy gói khám</h3>
               <p style={{ color: '#6b7280' }}>Thử tìm kiếm với từ khóa khác</p>
             </div>
           ) : (
             <>
-              {/* Results Header */}
               <div style={{ marginBottom: '24px' }}>
                 <p style={{ color: '#6b7280' }}>
-                  Tìm thấy <strong style={{ color: '#0d9488' }}>{filteredServices.length}</strong> dịch vụ
+                  Tìm thấy <strong style={{ color: '#0d9488' }}>{filteredPackages.length}</strong> gói khám
                 </p>
               </div>
 
-              {/* Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '24px'
               }}>
-                {filteredServices.map((service) => {
-                  const categoryColor = getCategoryColor(service.category)
-                  return (
-                    <div
-                      key={service.id}
-                      onClick={() => setSelectedService(service)}
-                      style={{
-                        backgroundColor: 'white',
-                        borderRadius: '16px',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        border: '1px solid #e5e7eb'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-8px)'
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'
-                      }}
-                    >
-                      {/* Card Header */}
+                {filteredPackages.map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    onClick={() => setSelectedPackage(pkg)}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e5e7eb',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-8px)'
+                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'
+                    }}
+                  >
+                    {pkg.isPopular && (
                       <div style={{
-                        background: `linear-gradient(135deg, ${categoryColor}, ${categoryColor}cc)`,
-                        padding: '32px 24px',
-                        textAlign: 'center',
-                        position: 'relative',
-                        overflow: 'hidden'
+                        position: 'absolute',
+                        top: '16px',
+                        right: '16px',
+                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                        color: 'white',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        boxShadow: '0 4px 12px rgba(245,158,11,0.3)',
+                        zIndex: 1
                       }}>
-                        {/* Decorative circle */}
+                        ⭐ Phổ biến
+                      </div>
+                    )}
+
+                    <div style={{
+                      background: 'linear-gradient(135deg, #0d9488, #0891b2)',
+                      padding: '32px 24px',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-20px',
+                        right: '-20px',
+                        width: '80px',
+                        height: '80px',
+                        background: 'rgba(255,255,255,0.15)',
+                        borderRadius: '50%'
+                      }}></div>
+                      
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        background: 'rgba(255,255,255,0.2)',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 12px',
+                        fontSize: '32px'
+                      }}>
+                        {pkg.icon || '🏥'}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '24px' }}>
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        marginBottom: '12px',
+                        minHeight: '44px'
+                      }}>
+                        {pkg.name}
+                      </h3>
+                      
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#6b7280',
+                        marginBottom: '16px',
+                        minHeight: '40px',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {pkg.description || 'Gói khám sức khỏe toàn diện'}
+                      </p>
+
+                      <div style={{
+                        background: '#f0fdfa',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        marginBottom: '16px'
+                      }}>
                         <div style={{
-                          position: 'absolute',
-                          top: '-20px',
-                          right: '-20px',
-                          width: '80px',
-                          height: '80px',
-                          background: 'rgba(255,255,255,0.15)',
-                          borderRadius: '50%'
-                        }}></div>
-                        
-                        <div style={{
-                          width: '64px',
-                          height: '64px',
-                          background: 'rgba(255,255,255,0.2)',
-                          borderRadius: '16px',
+                          fontSize: '13px',
+                          color: '#0d9488',
+                          fontWeight: '600',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          📋 Bao gồm {pkg.items?.length || 0} phần khám
+                        </div>
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 0',
+                        borderTop: '1px solid #f3f4f6',
+                        marginBottom: '16px'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#9ca3af' }}>Giá gói</div>
+                          <div style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '700', 
+                            color: '#0d9488' 
+                          }}>
+                            {formatPrice(pkg.price)}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '12px', color: '#9ca3af' }}>Thời gian</div>
+                          <div style={{ 
+                            fontSize: '14px', 
+                            fontWeight: '600', 
+                            color: '#374151',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            ⏱️ {pkg.duration} phút
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedPackage(pkg)
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '14px',
+                          background: 'linear-gradient(135deg, #0d9488, #0891b2)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontWeight: '600',
+                          fontSize: '15px',
+                          cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          margin: '0 auto 12px',
-                          fontSize: '32px'
-                        }}>
-                          {getServiceIcon(service)}
-                        </div>
-                        
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 12px',
-                          background: 'rgba(255,255,255,0.25)',
-                          borderRadius: '20px',
-                          color: 'white',
-                          fontSize: '12px',
-                          fontWeight: '500'
-                        }}>
-                          {service.category}
-                        </span>
-                      </div>
-
-                      {/* Card Body */}
-                      <div style={{ padding: '24px' }}>
-                        <h3 style={{
-                          fontSize: '17px',
-                          fontWeight: '600',
-                          color: '#1f2937',
-                          marginBottom: '12px',
-                          minHeight: '44px',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}>
-                          {service.name}
-                        </h3>
-                        
-                        <p style={{
-                          fontSize: '14px',
-                          color: '#6b7280',
-                          marginBottom: '16px',
-                          minHeight: '40px',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: '1.5'
-                        }}>
-                          {service.description || 'Dịch vụ y tế chất lượng cao'}
-                        </p>
-
-                        {/* Price & Duration */}
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '16px 0',
-                          borderTop: '1px solid #f3f4f6',
-                          marginBottom: '16px'
-                        }}>
-                          <div>
-                            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Giá từ</div>
-                            <div style={{ 
-                              fontSize: '18px', 
-                              fontWeight: '700', 
-                              color: categoryColor 
-                            }}>
-                              {formatPrice(service.price)}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Thời gian</div>
-                            <div style={{ 
-                              fontSize: '14px', 
-                              fontWeight: '600', 
-                              color: '#374151',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              ⏱️ {service.duration} phút
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* CTA Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push('/booking')
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '14px',
-                            background: `linear-gradient(135deg, ${categoryColor}, ${categoryColor}dd)`,
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontWeight: '600',
-                            fontSize: '15px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.02)'
-                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          📅 Đặt lịch ngay
-                        </button>
-                      </div>
+                          gap: '8px',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.03)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)'
+                        }}
+                      >
+                        Xem chi tiết
+                        <span>→</span>
+                      </button>
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
             </>
           )}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section style={{
-        background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
-        padding: '60px 0'
-      }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 20px', textAlign: 'center' }}>
-          <h2 style={{ 
-            fontSize: '32px', 
-            fontWeight: '700', 
-            color: 'white', 
-            marginBottom: '16px' 
-          }}>
-            Cần tư vấn thêm về dịch vụ?
-          </h2>
-          <p style={{ 
-            fontSize: '18px', 
-            color: 'rgba(255,255,255,0.9)', 
-            marginBottom: '32px' 
-          }}>
-            Đội ngũ tư vấn luôn sẵn sàng hỗ trợ bạn 24/7
-          </p>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
-              onClick={() => router.push('/booking')}
-              style={{
-                padding: '16px 32px',
-                background: 'white',
-                color: '#0d9488',
-                border: 'none',
-                borderRadius: '50px',
-                fontWeight: '700',
-                fontSize: '16px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
-              }}
-            >
-              📅 Đặt lịch khám ngay
-            </button>
-            <a 
-              href="tel:1900xxxx"
-              style={{
-                padding: '16px 32px',
-                background: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                border: '2px solid rgba(255,255,255,0.4)',
-                borderRadius: '50px',
-                fontWeight: '700',
-                fontSize: '16px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                textDecoration: 'none'
-              }}
-            >
-              📞 Hotline: 1900 xxxx
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Service Detail Modal */}
-      {selectedService && (
+      {/* Package Detail Modal */}
+      {selectedPackage && (
         <div 
-          onClick={() => setSelectedService(null)}
+          onClick={() => setSelectedPackage(null)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -565,22 +452,21 @@ export default function Services() {
             style={{
               backgroundColor: 'white',
               borderRadius: '24px',
-              maxWidth: '600px',
+              maxWidth: '700px',
               width: '100%',
               maxHeight: '90vh',
               overflow: 'auto',
               boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
             }}
           >
-            {/* Modal Header */}
             <div style={{
-              background: `linear-gradient(135deg, ${getCategoryColor(selectedService.category)}, ${getCategoryColor(selectedService.category)}cc)`,
+              background: 'linear-gradient(135deg, #0d9488, #0891b2)',
               padding: '32px',
               color: 'white',
               position: 'relative'
             }}>
               <button
-                onClick={() => setSelectedService(null)}
+                onClick={() => setSelectedPackage(null)}
                 style={{
                   position: 'absolute',
                   top: '16px',
@@ -592,10 +478,7 @@ export default function Services() {
                   borderRadius: '50%',
                   color: 'white',
                   fontSize: '20px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  cursor: 'pointer'
                 }}
               >
                 ✕
@@ -612,163 +495,104 @@ export default function Services() {
                   justifyContent: 'center',
                   fontSize: '36px'
                 }}>
-                  {getServiceIcon(selectedService)}
+                  {selectedPackage.icon || '🏥'}
                 </div>
                 <div>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    background: 'rgba(255,255,255,0.2)',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    marginBottom: '8px'
-                  }}>
-                    {selectedService.category}
-                  </span>
-                  <h2 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>
-                    {selectedService.name}
+                  <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+                    {selectedPackage.name}
                   </h2>
+                  <p style={{ opacity: 0.9 }}>{selectedPackage.description}</p>
                 </div>
               </div>
             </div>
-            
-            {/* Modal Body */}
+
             <div style={{ padding: '32px' }}>
-              {/* Price & Duration Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #f0fdfa, #ccfbf1)',
-                  padding: '20px',
-                  borderRadius: '16px',
-                  border: '1px solid #99f6e4'
-                }}>
-                  <div style={{ fontSize: '14px', color: '#0d9488', marginBottom: '4px', fontWeight: '500' }}>
-                    💰 Chi phí dịch vụ
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#0f766e' }}>
-                    {formatPrice(selectedService.price)}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '20px',
+                marginBottom: '32px',
+                padding: '20px',
+                background: '#f0fdfa',
+                borderRadius: '16px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Giá gói</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#0d9488' }}>
+                    {formatPrice(selectedPackage.price)}
                   </div>
                 </div>
-                <div style={{
-                  background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
-                  padding: '20px',
-                  borderRadius: '16px',
-                  border: '1px solid #93c5fd'
-                }}>
-                  <div style={{ fontSize: '14px', color: '#2563eb', marginBottom: '4px', fontWeight: '500' }}>
-                    ⏱️ Thời gian
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#1d4ed8' }}>
-                    {selectedService.duration} phút
+                <div>
+                  <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Thời gian</div>
+                  <div style={{ fontSize: '20px', fontWeight: '600', color: '#374151' }}>
+                    ⏱️ {selectedPackage.duration} phút
                   </div>
                 </div>
               </div>
-              
-              {/* Description */}
-              {selectedService.description && (
-                <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '600', 
-                    color: '#1f2937', 
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span style={{ width: '4px', height: '20px', background: '#0d9488', borderRadius: '2px' }}></span>
-                    Mô tả dịch vụ
-                  </h3>
-                  <p style={{
-                    color: '#4b5563',
-                    lineHeight: '1.7',
-                    background: '#f9fafb',
-                    padding: '16px',
-                    borderRadius: '12px'
-                  }}>
-                    {selectedService.description}
-                  </p>
-                </div>
-              )}
-              
-              {/* Benefits */}
-              <div style={{ marginBottom: '32px' }}>
-                <h3 style={{ 
-                  fontSize: '16px', 
-                  fontWeight: '600', 
-                  color: '#1f2937', 
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ width: '4px', height: '20px', background: '#0d9488', borderRadius: '2px' }}></span>
-                  Lợi ích khi sử dụng dịch vụ
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {[
-                    { icon: '👨‍⚕️', text: 'Đội ngũ bác sĩ chuyên môn cao, giàu kinh nghiệm' },
-                    { icon: '🏥', text: 'Trang thiết bị y tế hiện đại, tiên tiến' },
-                    { icon: '✅', text: 'Quy trình khám chữa bệnh chuyên nghiệp' },
-                    { icon: '💙', text: 'Tư vấn và hỗ trợ tận tình 24/7' }
-                  ].map((item, i) => (
-                    <div key={i} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 16px',
-                      background: '#f9fafb',
-                      borderRadius: '12px',
-                      transition: 'all 0.2s ease'
-                    }}>
-                      <span style={{ fontSize: '24px' }}>{item.icon}</span>
-                      <span style={{ color: '#4b5563', fontWeight: '500' }}>{item.text}</span>
+
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px', color: '#1f2937' }}>
+                Gói khám bao gồm:
+              </h3>
+
+              {selectedPackage.items && selectedPackage.items.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {Object.entries(groupItemsByCategory(selectedPackage.items)).map(([category, items]) => (
+                    <div key={category}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '12px',
+                        color: '#0d9488',
+                        fontWeight: '600'
+                      }}>
+                        <span style={{ fontSize: '20px' }}>{categoryIcons[category] || '📋'}</span>
+                        <span>{category}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px' }}>
+                        {items.map((item, idx) => (
+                          <div key={idx} style={{
+                            padding: '12px 16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            borderLeft: '3px solid #0d9488'
+                          }}>
+                            <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+                              {item.name}
+                            </div>
+                            {item.description && (
+                              <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                                {item.description}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-              
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  onClick={() => {
-                    setSelectedService(null)
-                    router.push('/booking')
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '16px',
-                    background: `linear-gradient(135deg, ${getCategoryColor(selectedService.category)}, ${getCategoryColor(selectedService.category)}dd)`,
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontWeight: '700',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  📅 Đặt lịch khám ngay
-                </button>
-                <button
-                  onClick={() => setSelectedService(null)}
-                  style={{
-                    padding: '16px 24px',
-                    background: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontWeight: '600',
-                    fontSize: '16px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Đóng
-                </button>
-              </div>
+              )}
+
+              <button
+                onClick={() => router.push('/booking')}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  marginTop: '32px',
+                  background: 'linear-gradient(135deg, #0d9488, #0891b2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                Đặt lịch khám ngay
+              </button>
             </div>
           </div>
         </div>

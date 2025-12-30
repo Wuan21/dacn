@@ -27,6 +27,7 @@ export default function WorkSchedule() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [selectedSchedules, setSelectedSchedules] = useState({})
+  const [slotDurations, setSlotDurations] = useState({}) // Thời lượng ca khám cho từng shift
   const [currentWeekStart, setCurrentWeekStart] = useState(null)
   const [message, setMessage] = useState({ type: '', text: '' })
   const router = useRouter()
@@ -42,14 +43,28 @@ export default function WorkSchedule() {
   }, [currentWeekStart])
 
   useEffect(() => {
-    // Set current week start on mount
+    // Set current week start on mount (Sunday as first day)
+    // Get today's date in local timezone
     const today = new Date()
-    const dayOfWeek = today.getDay()
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Monday as first day
-    const monday = new Date(today)
-    monday.setDate(today.getDate() + diff)
-    monday.setHours(0, 0, 0, 0)
-    setCurrentWeekStart(monday)
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const date = today.getDate()
+    const dayOfWeek = today.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    // Calculate the date of the Sunday of this week
+    const sundayDate = date - dayOfWeek
+    const sunday = new Date(year, month, sundayDate, 0, 0, 0, 0)
+    
+    console.log('=== Calculating Week Start ===')
+    console.log('Today:', today.toISOString())
+    console.log('Today local:', today.toLocaleString('vi-VN'))
+    console.log('Day of week:', dayOfWeek, ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek])
+    console.log('Sunday date:', sundayDate)
+    console.log('Week start (Sunday):', sunday.toISOString())
+    console.log('Week start local:', sunday.toLocaleString('vi-VN'))
+    console.log('Week start YYYY-MM-DD:', sunday.toISOString().split('T')[0])
+    
+    setCurrentWeekStart(sunday)
   }, [])
 
   async function checkAuth() {
@@ -87,20 +102,32 @@ export default function WorkSchedule() {
 
   async function loadSchedules() {
     try {
-      const weekStartStr = currentWeekStart.toISOString()
+      // Normalize weekStartDate to YYYY-MM-DD format
+      const weekStart = new Date(currentWeekStart)
+      weekStart.setHours(0, 0, 0, 0)
+      const weekStartStr = weekStart.toISOString().split('T')[0]
+      
       const res = await fetch(`/api/doctor/schedule?weekStart=${weekStartStr}`)
       if (res.ok) {
         const data = await res.json()
         // Convert to schedule map
         const scheduleMap = {}
+        const durationMap = {}
         data.forEach(schedule => {
           const key = `${schedule.dayOfWeek}-${schedule.shift}`
           scheduleMap[key] = schedule.isAvailable
+          durationMap[key] = schedule.slotDuration || 30
         })
         setSelectedSchedules(scheduleMap)
+        setSlotDurations(durationMap)
+      } else {
+        const error = await res.json()
+        console.error('API Error:', error)
+        setMessage({ type: 'error', text: error.error || 'Không thể tải lịch làm việc' })
       }
     } catch (err) {
-      console.error(err)
+      console.error('Fetch Error:', err)
+      setMessage({ type: 'error', text: 'Lỗi kết nối. Vui lòng thử lại.' })
     }
   }
 
@@ -109,6 +136,21 @@ export default function WorkSchedule() {
     setSelectedSchedules(prev => ({
       ...prev,
       [key]: !prev[key]
+    }))
+    // Nếu đang chọn và chưa có duration, set mặc định 30 phút
+    if (!selectedSchedules[key] && !slotDurations[key]) {
+      setSlotDurations(prev => ({
+        ...prev,
+        [key]: 30
+      }))
+    }
+  }
+
+  function updateSlotDuration(dayId, shiftId, duration) {
+    const key = `${dayId}-${shiftId}`
+    setSlotDurations(prev => ({
+      ...prev,
+      [key]: parseInt(duration)
     }))
   }
 
@@ -122,8 +164,10 @@ export default function WorkSchedule() {
   function navigateWeek(direction) {
     const newWeekStart = new Date(currentWeekStart)
     newWeekStart.setDate(newWeekStart.getDate() + (direction * 7))
+    newWeekStart.setHours(0, 0, 0, 0)
     setCurrentWeekStart(newWeekStart)
-    setSelectedSchedules({})
+    // Clear message when changing weeks
+    setMessage({ type: '', text: '' })
   }
 
   function getDayDate(dayId) {
@@ -175,28 +219,46 @@ export default function WorkSchedule() {
             shift,
             startTime: shiftInfo.startTime,
             endTime: shiftInfo.endTime,
+            slotDuration: slotDurations[key] || 30,
             isAvailable: true
           })
         }
       })
+
+      // Normalize weekStartDate to YYYY-MM-DD format
+      const weekStart = new Date(currentWeekStart)
+      weekStart.setHours(0, 0, 0, 0)
+      const weekStartStr = weekStart.toISOString().split('T')[0]
+
+      console.log('Sending schedules:', schedules)
+      console.log('Sending weekStartDate:', weekStartStr)
 
       const res = await fetch('/api/doctor/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           schedules,
-          weekStartDate: currentWeekStart.toISOString()
+          weekStartDate: weekStartStr
         })
       })
 
+      const data = await res.json()
+      console.log('Response:', data)
+
       if (res.ok) {
         setMessage({ type: 'success', text: 'Lưu lịch làm việc thành công!' })
+        // Reload schedules to refresh the UI
+        setTimeout(() => {
+          loadSchedules()
+        }, 500)
       } else {
-        const data = await res.json()
-        setMessage({ type: 'error', text: data.error || 'Có lỗi xảy ra' })
+        console.error('Error response:', data)
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || 'Có lỗi xảy ra')
+        setMessage({ type: 'error', text: errorMsg })
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Có lỗi xảy ra' })
+      console.error('Save error:', err)
+      setMessage({ type: 'error', text: `Lỗi: ${err.message}` })
     } finally {
       setSaving(false)
     }
@@ -527,59 +589,97 @@ export default function WorkSchedule() {
                   const key = `${day.id}-${shift.id}`
                   const isSelected = selectedSchedules[key]
                   return (
-                    <button
-                      key={shift.id}
-                      onClick={() => toggleSchedule(day.id, shift.id)}
-                      style={{
-                        padding: '16px',
-                        background: isSelected 
-                          ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' 
-                          : '#f3f4f6',
-                        color: isSelected ? 'white' : '#666',
-                        border: isSelected ? '2px solid #2563eb' : '2px solid #e5e7eb',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      {isSelected ? (
-                        <>
-                          <span style={{ 
-                            width: '20px', 
-                            height: '20px', 
-                            background: 'white', 
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#2563eb',
-                            fontSize: '12px',
-                            fontWeight: '700'
-                          }}>✓</span>
-                          Đã chọn
-                        </>
-                      ) : (
-                        <>
-                          <span style={{ 
-                            width: '20px', 
-                            height: '20px', 
-                            background: '#e5e7eb', 
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '12px'
-                          }}>🕐</span>
-                          Chọn
-                        </>
+                    <div key={shift.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        onClick={() => toggleSchedule(day.id, shift.id)}
+                        style={{
+                          padding: '16px',
+                          background: isSelected 
+                            ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' 
+                            : '#f3f4f6',
+                          color: isSelected ? 'white' : '#666',
+                          border: isSelected ? '2px solid #2563eb' : '2px solid #e5e7eb',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        {isSelected ? (
+                          <>
+                            <span style={{ 
+                              width: '20px', 
+                              height: '20px', 
+                              background: 'white', 
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#2563eb',
+                              fontSize: '12px',
+                              fontWeight: '700'
+                            }}>✓</span>
+                            Đã chọn
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ 
+                              width: '20px', 
+                              height: '20px', 
+                              background: '#e5e7eb', 
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px'
+                            }}>🕐</span>
+                            Chọn
+                          </>
+                        )}
+                      </button>
+                      {isSelected && (
+                        <div style={{ 
+                          padding: '8px 12px', 
+                          background: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <label style={{ 
+                            fontSize: '12px', 
+                            color: '#666',
+                            display: 'block',
+                            marginBottom: '4px',
+                            fontWeight: '500'
+                          }}>
+                            ⏱️ Thời lượng 1 ca:
+                          </label>
+                          <select
+                            value={slotDurations[key] || 30}
+                            onChange={(e) => updateSlotDuration(day.id, shift.id, e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              cursor: 'pointer',
+                              background: 'white'
+                            }}
+                          >
+                            <option value="15">15 phút</option>
+                            <option value="20">20 phút</option>
+                            <option value="30">30 phút</option>
+                            <option value="45">45 phút</option>
+                            <option value="60">60 phút</option>
+                          </select>
+                        </div>
                       )}
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -662,6 +762,7 @@ export default function WorkSchedule() {
               <li>Bạn cần chọn ít nhất <strong>{MIN_SHIFTS_REQUIRED} buổi làm việc</strong> trong tuần</li>
               <li>Trong đó phải có ít nhất <strong>{MIN_EVENING_SHIFTS} buổi tối</strong> (18:00 - 22:00)</li>
               <li>Click vào ô để chọn/bỏ chọn ca làm việc</li>
+              <li>Sau khi chọn ca, bạn có thể chọn <strong>thời lượng 1 ca khám</strong> (15-60 phút). Hệ thống sẽ tự động sinh các slot khám theo thời lượng này</li>
               <li>Sau khi chọn đủ, nhấn "Lưu lịch làm việc" để lưu</li>
               <li>Bạn có thể đăng ký lịch cho các tuần tiếp theo bằng cách chuyển tuần</li>
             </ul>

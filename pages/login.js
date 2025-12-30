@@ -1,46 +1,101 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { signIn } from 'next-auth/react'
+import { getSession } from 'next-auth/react'
 import Link from 'next/link'
+
+export async function getServerSideProps(context) {
+  const session = await getSession(context)
+  
+  // Redirect if already logged in
+  if (session) {
+    const role = session.user.role
+    if (role === 'admin') {
+      return { redirect: { destination: '/admin', permanent: false } }
+    } else if (role === 'doctor') {
+      return { redirect: { destination: '/doctor', permanent: false } }
+    } else {
+      return { redirect: { destination: '/patient/appointments', permanent: false } }
+    }
+  }
+  
+  return { props: {} }
+}
 
 export default function Login(){
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { redirect, activated, registered, error: urlError } = router.query
+
+  // Show success messages
+  useEffect(() => {
+    if (activated) {
+      setSuccess('Tài khoản đã được kích hoạt thành công! Bạn có thể đăng nhập ngay.')
+    } else if (registered) {
+      setSuccess('Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt tài khoản.')
+    }
+    
+    // Handle error from URL (NextAuth redirect)
+    if (urlError && urlError !== 'undefined') {
+      if (urlError.includes('ACCOUNT_NOT_ACTIVATED')) {
+        setError('Tài khoản chưa được kích hoạt. Vui lòng kích hoạt tài khoản trước khi đăng nhập.')
+      } else if (urlError === 'CredentialsSignin') {
+        setError('Email hoặc mật khẩu không đúng')
+      } else {
+        setError('Có lỗi xảy ra khi đăng nhập')
+      }
+    }
+  }, [activated, registered, urlError])
 
   async function submit(e){
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
       })
-      
-      const data = await res.json()
-      
-      if (res.ok) {
-        // Redirect based on role
-        if (data.role === 'admin') {
-          router.push('/admin')
-        } else if (data.role === 'doctor') {
-          router.push('/doctor')
+
+      if (result?.error) {
+        // Kiểm tra lỗi tài khoản chưa kích hoạt
+        if (result.error.includes('ACCOUNT_NOT_ACTIVATED')) {
+          setError('Tài khoản chưa được kích hoạt. Bạn sẽ được chuyển đến trang kích hoạt...')
+          // Chuyển đến trang activation sau 2 giây
+          setTimeout(() => {
+            router.push(`/activate?email=${encodeURIComponent(email)}`)
+          }, 2000)
         } else {
-          router.push('/patient/appointments')
+          setError(result.error || 'Email hoặc mật khẩu không đúng')
         }
-      } else {
-        if (res.status === 403) {
-          setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.')
-        } else {
-          setError(data.error || 'Đăng nhập thất bại')
+      } else if (result?.ok) {
+        // Get user role and redirect accordingly
+        const res = await fetch('/api/auth/session')
+        const session = await res.json()
+        
+        if (session?.user) {
+          const role = session.user.role
+          if (redirect) {
+            router.push(redirect)
+          } else if (role === 'admin') {
+            router.push('/admin')
+          } else if (role === 'doctor') {
+            router.push('/doctor')
+          } else {
+            router.push('/patient/appointments')
+          }
         }
       }
     } catch (err) {
+      console.error('Login error:', err)
       setError('Có lỗi xảy ra, vui lòng thử lại')
     } finally {
       setLoading(false)
@@ -98,6 +153,16 @@ export default function Login(){
               <h2>Đăng nhập</h2>
               <p>Nhập thông tin tài khoản của bạn</p>
             </div>
+
+            {success && (
+              <div className="alert-success">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>{success}</span>
+              </div>
+            )}
 
             {error && (
               <div className="alert-error">
@@ -370,13 +435,27 @@ export default function Login(){
           animation: shake 0.4s ease-out;
         }
 
+        .alert-success {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 12px;
+          color: #16a34a;
+          font-size: 14px;
+          margin-bottom: 24px;
+        }
+
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-10px); }
           75% { transform: translateX(10px); }
         }
 
-        .alert-error svg {
+        .alert-error svg,
+        .alert-success svg {
           flex-shrink: 0;
         }
 

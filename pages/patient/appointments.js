@@ -59,6 +59,24 @@ export default function MyAppointments(){
       return
     }
     
+    // Kiểm tra thời gian hủy (client-side check trước khi gọi API)
+    const appointment = appointments.find(a => a.id === appointmentToCancel)
+    if (appointment) {
+      const appointmentTime = new Date(appointment.appointmentDate)
+      const now = new Date()
+      const hoursDiff = (appointmentTime - now) / (1000 * 60 * 60)
+      
+      if (hoursDiff < 2) {
+        alert('⚠️ Chỉ có thể hủy lịch trước 2 giờ so với giờ khám.\n\nThời gian khám: ' + appointmentTime.toLocaleString('vi-VN') + '\nVui lòng liên hệ trực tiếp với bệnh viện nếu cần hủy gấp.')
+        return
+      }
+      
+      if (appointment.status === 'completed') {
+        alert('⚠️ Không thể hủy lịch hẹn đã hoàn thành')
+        return
+      }
+    }
+    
     try {
       const res = await fetch(`/api/appointments/${appointmentToCancel}`, {
         method: 'PATCH',
@@ -75,7 +93,7 @@ export default function MyAppointments(){
       const data = await res.json()
       
       if (res.ok) {
-        alert('Đã hủy lịch hẹn thành công!')
+        alert('✅ Đã hủy lịch hẹn thành công!')
         loadAppointments()
         setShowDetailModal(false)
         setShowCancelModal(false)

@@ -33,27 +33,32 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Doctor profile not found' })
   }
 
-  const doctorProfileId = user.doctorprofile.id
+  const doctorProfile = user.doctorprofile
 
   if (req.method === 'GET') {
     try {
       const { weekStart } = req.query
       
-      let whereClause = { doctorProfileId }
-      
-      if (weekStart) {
-        whereClause.weekStartDate = new Date(weekStart)
+      if (!weekStart) {
+        return res.status(400).json({ error: 'weekStart is required' })
       }
 
-      const schedules = await prisma.doctorschedule.findMany({
-        where: whereClause,
-        orderBy: [
-          { dayOfWeek: 'asc' },
-          { shift: 'asc' }
-        ]
-      })
+      // Parse schedules from JSON field
+      let allSchedules = {}
+      try {
+        allSchedules = doctorProfile.schedules ? JSON.parse(doctorProfile.schedules) : {}
+      } catch (e) {
+        console.error('Error parsing schedules:', e)
+        allSchedules = {}
+      }
 
-      return res.status(200).json(schedules)
+      // Get schedules for this week
+      const weekSchedules = allSchedules[weekStart] || []
+      
+      console.log('GET - weekStart:', weekStart)
+      console.log('GET - Found schedules:', weekSchedules.length)
+
+      return res.status(200).json(weekSchedules)
     } catch (error) {
       console.error('Error fetching schedules:', error)
       return res.status(500).json({ error: 'Failed to fetch schedules' })
@@ -64,75 +69,51 @@ export default async function handler(req, res) {
     try {
       const { schedules, weekStartDate } = req.body
 
+      console.log('POST - Received schedules:', schedules?.length)
+      console.log('POST - Received weekStartDate:', weekStartDate)
+
       if (!schedules || !Array.isArray(schedules)) {
         return res.status(400).json({ error: 'Invalid schedules data' })
       }
 
-      // Delete existing schedules for this week
-      if (weekStartDate) {
-        await prisma.doctorschedule.deleteMany({
-          where: {
-            doctorProfileId,
-            weekStartDate: new Date(weekStartDate)
-          }
-        })
+      if (!weekStartDate) {
+        return res.status(400).json({ error: 'weekStartDate is required' })
       }
 
-      // Create new schedules
-      const createdSchedules = await Promise.all(
-        schedules.map(schedule => 
-          prisma.doctorschedule.create({
-            data: {
-              doctorProfileId,
-              dayOfWeek: schedule.dayOfWeek,
-              shift: schedule.shift,
-              startTime: schedule.startTime,
-              endTime: schedule.endTime,
-              isAvailable: schedule.isAvailable ?? true,
-              weekStartDate: weekStartDate ? new Date(weekStartDate) : null
-            }
-          })
-        )
-      )
+      // Parse existing schedules
+      let allSchedules = {}
+      try {
+        allSchedules = doctorProfile.schedules ? JSON.parse(doctorProfile.schedules) : {}
+      } catch (e) {
+        console.error('Error parsing existing schedules:', e)
+        allSchedules = {}
+      }
+
+      // Update schedules for this week
+      allSchedules[weekStartDate] = schedules
+
+      // Save back to database
+      await prisma.doctorprofile.update({
+        where: { id: doctorProfile.id },
+        data: {
+          schedules: JSON.stringify(allSchedules)
+        }
+      })
+
+      console.log('POST - Saved schedules for week:', weekStartDate)
 
       return res.status(201).json({ 
         message: 'Schedules saved successfully',
-        schedules: createdSchedules 
+        count: schedules.length,
+        schedules: schedules
       })
     } catch (error) {
-      console.error('Error saving schedules:', error)
-      return res.status(500).json({ error: 'Failed to save schedules' })
-    }
-  }
-
-  if (req.method === 'PUT') {
-    try {
-      const { id, isAvailable } = req.body
-
-      const schedule = await prisma.doctorschedule.update({
-        where: { id: parseInt(id) },
-        data: { isAvailable }
+      console.error('POST - Error saving schedules:', error)
+      console.error('POST - Error stack:', error.stack)
+      return res.status(500).json({ 
+        error: 'Lỗi khi lưu lịch làm việc',
+        details: error.message
       })
-
-      return res.status(200).json(schedule)
-    } catch (error) {
-      console.error('Error updating schedule:', error)
-      return res.status(500).json({ error: 'Failed to update schedule' })
-    }
-  }
-
-  if (req.method === 'DELETE') {
-    try {
-      const { id } = req.query
-
-      await prisma.doctorschedule.delete({
-        where: { id: parseInt(id) }
-      })
-
-      return res.status(200).json({ message: 'Schedule deleted' })
-    } catch (error) {
-      console.error('Error deleting schedule:', error)
-      return res.status(500).json({ error: 'Failed to delete schedule' })
     }
   }
 

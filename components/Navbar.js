@@ -1,61 +1,26 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import { useSession, signOut } from 'next-auth/react'
 
 export default function Navbar() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data: session, status } = useSession()
   const [showDropdown, setShowDropdown] = useState(false)
   const [doctorProfile, setDoctorProfile] = useState(null)
   const router = useRouter()
+  const loading = status === 'loading'
+  const user = session?.user
 
   useEffect(() => {
-    checkAuth()
-    
-    // Listen for profile update events
-    const handleProfileUpdate = () => {
-      checkAuth()
+    // Load doctor profile if user is doctor
+    if (user?.role === 'doctor') {
+      loadDoctorProfile()
     }
-    
-    window.addEventListener('profileUpdated', handleProfileUpdate)
-    
-    return () => {
-      window.removeEventListener('profileUpdated', handleProfileUpdate)
-    }
-  }, [])
-
-  async function checkAuth() {
-    try {
-      const res = await fetch('/api/auth/me')
-      if (res.ok) {
-        const data = await res.json()
-        setUser(data)
-        
-        // Load profiles immediately without separate calls
-        if (data.role === 'doctor') {
-          await loadDoctorProfile()
-        } else if (data.role === 'patient') {
-          await loadPatientProfile()
-        }
-      } else {
-        setUser(null)
-      }
-    } catch (err) {
-      console.error(err)
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user])
 
   async function loadDoctorProfile() {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/doctor/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const res = await fetch('/api/doctor/profile')
       if (res.ok) {
         const data = await res.json()
         setDoctorProfile(data)
@@ -65,27 +30,9 @@ export default function Navbar() {
     }
   }
 
-  async function loadPatientProfile() {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/patient/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setUser(data)
-      }
-    } catch (err) {
-      console.error('Error loading patient profile:', err)
-    }
-  }
-
   async function handleLogout() {
-    await fetch('/api/auth/logout')
-    setUser(null)
     setShowDropdown(false)
+    await signOut({ redirect: false })
     router.push('/')
   }
 
@@ -513,11 +460,11 @@ export default function Navbar() {
                             e.currentTarget.style.background = 'white'
                           }}
                         >
-                          <span style={{ fontSize: '18px' }}></span>
+                          <span style={{ fontSize: '18px' }}>⚙️</span>
                           Quản trị
                         </Link>
                         <Link 
-                          href="/admin/services"
+                          href="/admin/stats"
                           onClick={() => setShowDropdown(false)}
                           style={{
                             display: 'flex',
@@ -538,33 +485,8 @@ export default function Navbar() {
                             e.currentTarget.style.background = 'white'
                           }}
                         >
-                          <span style={{ fontSize: '18px' }}>🏥</span>
-                          Quản lý dịch vụ
-                        </Link>
-                        <Link 
-                          href="/admin/support"
-                          onClick={() => setShowDropdown(false)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            padding: '14px 16px',
-                            color: '#333',
-                            textDecoration: 'none',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            transition: 'all 0.2s ease',
-                            borderBottom: '1px solid #f0f0f0'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#f9fafb'
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'white'
-                          }}
-                        >
-                          <span style={{ fontSize: '18px' }}>💬</span>
-                          Hỗ trợ CSKH
+                          <span style={{ fontSize: '18px' }}>📊</span>
+                          Thống kê
                         </Link>
                       </>
                     )}

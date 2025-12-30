@@ -41,21 +41,23 @@ export default function Register() {
           name, 
           phone: phone || null,
           dateOfBirth: dateOfBirth ? new Date(dateOfBirth).toISOString() : null,
-          password, 
-          role: 'patient' 
+          password
         })
       })
       
       const data = await res.json()
       
       if (res.ok) {
-        router.push('/login?registered=true')
+        // Chuyển đến trang kích hoạt với email
+        const activateUrl = `/activate?email=${encodeURIComponent(email)}`
+        window.location.href = activateUrl
       } else {
         setError(data.error || 'Đăng ký thất bại')
+        setLoading(false)
       }
     } catch (err) {
+      console.error('Register error:', err)
       setError('Có lỗi xảy ra, vui lòng thử lại')
-    } finally {
       setLoading(false)
     }
   }
@@ -137,7 +139,7 @@ export default function Register() {
                   type="text"
                   value={name} 
                   onChange={e=>setName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
+                  placeholder=""
                   required
                   autoComplete="name"
                 />
@@ -156,7 +158,7 @@ export default function Register() {
                   type="email"
                   value={email} 
                   onChange={e=>setEmail(e.target.value)}
-                  placeholder="example@gmail.com"
+                  placeholder=""
                   required
                   autoComplete="email"
                 />
@@ -175,7 +177,7 @@ export default function Register() {
                     type="tel"
                     value={phone} 
                     onChange={e=>setPhone(e.target.value)}
-                    placeholder="0912 345 678"
+                    placeholder=""
                     autoComplete="tel"
                   />
                 </div>
@@ -214,7 +216,7 @@ export default function Register() {
                     type={showPassword ? "text" : "password"}
                     value={password} 
                     onChange={e=>setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder=""
                     required
                     autoComplete="new-password"
                     className="password-input"
@@ -256,7 +258,7 @@ export default function Register() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword} 
                     onChange={e=>setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder=""
                     required
                     autoComplete="new-password"
                     className="password-input"

@@ -1,5 +1,6 @@
 const prisma = require('../../../lib/prisma')
 const { getTokenFromReq, verifyToken } = require('../../../lib/auth')
+const { sendAppointmentConfirmation } = require('../../../lib/emailService')
 
 export default async function handler(req, res){
   const token = getTokenFromReq(req)
@@ -61,11 +62,11 @@ export default async function handler(req, res){
   if (req.method === 'POST'){
     try {
       // Create appointment (patient books doctor)
-      const { doctorId, datetime } = req.body
+      const { doctorProfileId, datetime } = req.body
       
-      console.log('Creating appointment:', { doctorId, datetime, userId: decoded.userId, role: decoded.role })
+      console.log('Creating appointment:', { doctorProfileId, datetime, userId: decoded.userId, role: decoded.role })
       
-      if (!doctorId || !datetime) {
+      if (!doctorProfileId || !datetime) {
         return res.status(400).json({ error: 'Thiếu thông tin' })
       }
       
@@ -87,9 +88,9 @@ export default async function handler(req, res){
         return res.status(400).json({ error: 'Thời gian không hợp lệ' })
       }
       
-      // Find doctor profile by user id
-      const doctorProfile = await prisma.doctorprofile.findFirst({
-        where: { userId: parseInt(doctorId) },
+      // Validate doctor profile exists
+      const doctorProfile = await prisma.doctorprofile.findUnique({
+        where: { id: parseInt(doctorProfileId) },
         include: { user: true }
       })
       
@@ -97,12 +98,76 @@ export default async function handler(req, res){
         return res.status(404).json({ error: 'Bác sĩ không tồn tại' })
       }
       
-      // Kiểm tra trùng lịch cho bác sĩ (cùng thời gian)
+      // Kiểm tra bác sĩ có lịch làm việc trong ngày đó không
+      const dayOfWeek = appointmentDate.getDay()
+      const year = appointmentDate.getFullYear()
+      const month = appointmentDate.getMonth()
+      const day = appointmentDate.getDate()
+      
+      // Tính ngày chủ nhật (tuần bắt đầu từ chủ nhật = 0)
+      const sundayDate = new Date(year, month, day)
+      sundayDate.setDate(sundayDate.getDate() - dayOfWeek)
+      sundayDate.setHours(0, 0, 0, 0)
+      const weekStartStr = sundayDate.toISOString().split('T')[0]
+      
+      console.log('📅 Appointment booking - Date calculation:', {
+        appointmentDate: appointmentDate.toISOString(),
+        dayOfWeek,
+        weekStartDate: weekStartStr
+      })
+      
+      const timeStr = `${String(appointmentDate.getHours()).padStart(2, '0')}:${String(appointmentDate.getMinutes()).padStart(2, '0')}`
+      
+      // Kiểm tra xem slot có trong lịch làm việc của bác sĩ không
+      // Đọc lịch từ trường schedules (JSON)
+      
+      let allSchedulesData = {}
+      try {
+        allSchedulesData = doctorProfile.schedules ? JSON.parse(doctorProfile.schedules) : {}
+      } catch (e) {
+        console.error('Error parsing doctor schedules:', e)
+        allSchedulesData = {}
+      }
+      
+      const weekSchedules = allSchedulesData[weekStartStr] || []
+      const doctorSchedules = weekSchedules.filter(s => s.dayOfWeek === dayOfWeek && s.isAvailable)
+      
+      if (doctorSchedules.length === 0) {
+        return res.status(400).json({ error: 'Bác sĩ không có lịch làm việc trong ngày này' })
+      }
+      
+      // Kiểm tra thời gian có nằm trong các khung giờ làm việc không
+      let isValidSlot = false
+      for (const schedule of doctorSchedules) {
+        const scheduleStart = schedule.startTime
+        const scheduleEnd = schedule.endTime
+        
+        if (timeStr >= scheduleStart && timeStr < scheduleEnd) {
+          // Kiểm tra xem thời gian có đúng với slot duration không
+          const [startHour, startMinute] = scheduleStart.split(':').map(Number)
+          const startMinutes = startHour * 60 + startMinute
+          const [slotHour, slotMinute] = timeStr.split(':').map(Number)
+          const slotMinutes = slotHour * 60 + slotMinute
+          const diff = slotMinutes - startMinutes
+          
+          const slotDuration = schedule.slotDuration || 30
+          if (diff >= 0 && diff % slotDuration === 0) {
+            isValidSlot = true
+            break
+          }
+        }
+      }
+      
+      if (!isValidSlot) {
+        return res.status(400).json({ error: 'Khung giờ không hợp lệ. Vui lòng chọn khung giờ trong lịch làm việc của bác sĩ.' })
+      }
+      
+      // Kiểm tra trùng lịch cho bác sĩ (cùng thời gian) - mỗi khung giờ chỉ 1 bệnh nhân
       const existingAppt = await prisma.appointment.findFirst({
         where: {
-          doctorProfileId: doctorProfile.id,
+          doctorProfileId: parseInt(doctorProfileId),
           appointmentTime: appointmentDate,
-          status: { not: 'cancelled' }
+          status: { in: ['pending', 'confirmed'] }
         }
       })
       
@@ -110,29 +175,35 @@ export default async function handler(req, res){
         return res.status(409).json({ error: 'Khung giờ này đã có người đặt. Vui lòng chọn giờ khác.' })
       }
       
-      // Kiểm tra bệnh nhân đã đặt lịch này chưa
+      // Kiểm tra bệnh nhân có đang có lịch hẹn khác trong cùng ngày không (không quan tâm bác sĩ hay khoa nào)
+      const startOfDay = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate(), 0, 0, 0, 0)
+      const endOfDay = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate(), 23, 59, 59, 999)
+      
       const patientExisting = await prisma.appointment.findFirst({
         where: {
           patientId: decoded.userId,
-          doctorProfileId: doctorProfile.id,
-          appointmentTime: appointmentDate,
-          status: { not: 'cancelled' }
+          appointmentTime: {
+            gte: startOfDay,
+            lte: endOfDay
+          },
+          status: { in: ['pending', 'confirmed'] }
         }
       })
       
       if (patientExisting) {
-        return res.status(409).json({ error: 'Bạn đã đặt lịch này rồi' })
+        return res.status(409).json({ error: 'Bạn đã có lịch hẹn trong ngày này. Mỗi ngày chỉ được đặt một lịch khám.' })
       }
       
       // Tạo lịch hẹn
       const appt = await prisma.appointment.create({
         data: {
           patientId: decoded.userId,
-          doctorProfileId: doctorProfile.id,
+          doctorProfileId: parseInt(doctorProfileId),
           appointmentTime: appointmentDate,
           status: 'pending'
         },
         include: {
+          patient: { select: { id: true, name: true, email: true } },
           doctorProfile: {
             include: {
               user: { select: { id: true, name: true } },
@@ -143,6 +214,34 @@ export default async function handler(req, res){
       })
       
       console.log('Appointment created successfully:', appt.id)
+      
+      // Gửi email xác nhận (không chặn response nếu email fail)
+      try {
+        const dateFormatted = new Date(appointmentDate).toLocaleDateString('vi-VN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+        const timeFormatted = new Date(appointmentDate).toLocaleTimeString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+        
+        await sendAppointmentConfirmation({
+          patientEmail: appt.patient.email,
+          patientName: appt.patient.name,
+          doctorName: appt.doctorProfile.user.name,
+          specialty: appt.doctorProfile.specialty.name,
+          appointmentDate: dateFormatted,
+          appointmentTime: timeFormatted
+        })
+        console.log('✅ Confirmation email sent to:', appt.patient.email)
+      } catch (emailError) {
+        // Log lỗi nhưng không fail request
+        console.error('⚠️ Failed to send confirmation email:', emailError.message)
+      }
+      
       return res.status(201).json(appt)
     } catch (error) {
       console.error('Error creating appointment:', error)

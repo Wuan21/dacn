@@ -34,8 +34,14 @@ model doctorprofile {
   address1        String?
   address2        String?
   profileImage    String?           @db.LongText
+  // Lịch làm việc cố định hàng tuần (JSON)
+  // Format: [{"dayOfWeek": 1, "shifts": [{"shift": "morning", "startTime": "07:30", "endTime": "11:30"}]}]
+  workSchedule    String?           @db.Text
+  slotDuration    Int               @default(30) // Thời lượng 1 slot khám (phút)
+  // Lịch làm việc theo tuần (JSON) - lưu theo từng tuần cụ thể
+  // Format: {"2025-12-28": [{"dayOfWeek": 1, "shift": "morning", "startTime": "08:00", "endTime": "12:00", "slotDuration": 30, "isAvailable": true}]}
+  schedules       String?           @db.LongText
   appointments    appointment[]
-  doctorschedules doctorschedule[]
   user            user              @relation(fields: [userId], references: [id], onDelete: Cascade)
   specialty       specialty         @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
 
@@ -78,53 +84,51 @@ model specialty {
   @@map("specialties")
 }
 
-model doctorschedule {
-  id              Int           @id @default(autoincrement())
-  doctorProfileId Int
-  dayOfWeek       Int           // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  shift           String        // 'morning', 'afternoon', 'evening'
-  startTime       String        // '08:00'
-  endTime         String        // '12:00'
-  isAvailable     Boolean       @default(true)
-  weekStartDate   DateTime?     // Ngày bắt đầu tuần (để quản lý theo tuần cụ thể)
-  createdAt       DateTime?     @default(now())
-  updatedAt       DateTime?     @updatedAt
-  doctorProfile   doctorprofile @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
+model servicepackage {
+  id          Int                    @id @default(autoincrement())
+  name        String
+  description String?                @db.Text
+  price       Decimal                @db.Decimal(10, 2)
+  duration    Int                    // Thời gian ước tính (phút)
+  icon        String?                @db.VarChar(50)
+  isActive    Boolean?               @default(true)
+  isPopular   Boolean?               @default(false) // Gói phổ biến
+  createdAt   DateTime?              @default(now())
+  items       servicepackageitem[]
 
-  @@unique([doctorProfileId, dayOfWeek, shift, weekStartDate])
-  @@index([doctorProfileId])
-  @@map("doctor_schedules")
+  @@map("service_packages")
 }
 
-model service {
-  id          Int       @id @default(autoincrement())
-  name        String
-  description String?   @db.Text
-  price       Decimal   @db.Decimal(10, 2)
-  duration    Int
-  category    String?
-  icon        String?   @db.VarChar(50)
-  isActive    Boolean?  @default(true)
-  createdAt   DateTime? @default(now())
+model servicepackageitem {
+  id               Int            @id @default(autoincrement())
+  packageId        Int
+  name             String         // Tên phần khám (VD: Xét nghiệm máu, X-quang phổi,...)
+  description      String?        @db.Text
+  category         String?        // Loại: 'Xét nghiệm', 'Chẩn đoán hình ảnh', 'Khám lâm sàng'
+  displayOrder     Int            @default(0)
+  package          servicepackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
-  @@map("services")
+  @@index([packageId])
+  @@map("service_package_items")
 }
 
 model user {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique
-  name          String?
-  password      String
-  role          users_role     @default(patient)
-  isActive      Boolean?       @default(true)
-  phone         String?
-  address       String?
-  dateOfBirth   DateTime?
-  gender        users_gender?
-  profileImage  String?        @db.LongText
-  createdAt     DateTime?      @default(now())
-  appointments  appointment[]
-  doctorprofile doctorprofile?
+  id                   Int            @id @default(autoincrement())
+  email                String         @unique
+  name                 String?
+  password             String
+  role                 users_role     @default(patient)
+  isActive             Boolean?       @default(false)
+  activationCode       String?
+  activationCodeExpiry DateTime?
+  phone                String?
+  address              String?
+  dateOfBirth          DateTime?
+  gender               users_gender?
+  profileImage         String?        @db.LongText
+  createdAt            DateTime?      @default(now())
+  appointments         appointment[]
+  doctorprofile        doctorprofile?
 
   @@map("users")
 }

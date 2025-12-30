@@ -1,5 +1,6 @@
 const prisma = require('../../../lib/prisma')
-const { getTokenFromReq, verifyToken } = require('../../../lib/auth')
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../auth/[...nextauth]'
 const bcrypt = require('bcryptjs')
 
 export default async function handler(req, res) {
@@ -7,17 +8,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const token = getTokenFromReq(req)
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
+  const session = await getServerSession(req, res, authOptions)
   
-  let decoded
-  try { 
-    decoded = verifyToken(token) 
-  } catch { 
-    return res.status(401).json({ error: 'Invalid token' }) 
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  if (decoded.role !== 'admin') {
+  if (session.user.role !== 'admin') {
     return res.status(403).json({ error: 'Forbidden' })
   }
 
